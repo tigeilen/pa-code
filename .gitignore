@@ -5,3 +5,7 @@ dist/
 *.vsix
 .DS_Store
 .playwright-mcp/
+# stray archives / backups
+*.zip
+*- Kopie.*
+*_old.*
