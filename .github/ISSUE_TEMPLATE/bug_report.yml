@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a problem with PA Code
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug! ⚠️ Please do **not** include credentials, tokens, server URLs or confidential model/customer data in this report.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: pa-code-version
+    attributes:
+      label: PA Code version
+      placeholder: e.g. 3.8.0
+    validations:
+      required: true
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+      placeholder: e.g. 1.106.1
+  - type: dropdown
+    id: tm1-version
+    attributes:
+      label: TM1 / Planning Analytics version
+      options:
+        - v11 (on-prem / PA on Cloud)
+        - v12 / PA as a Service
+        - Not sure
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Windows 11
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Relevant output from the PA Code output channels or screenshots. Redact any secrets or customer data.
