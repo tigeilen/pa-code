@@ -1,0 +1,922 @@
+{
+  "name": "pa-code",
+  "publisher": "TimGeilen",
+  "author": "Tim Geilen",
+  "displayName": "pa-code",
+  "description": "TM1 Process Editor with Git Integration",
+  "version": "3.8.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tigeilen/pa-code.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tigeilen/pa-code/issues"
+  },
+  "homepage": "https://github.com/tigeilen/pa-code#readme",
+  "icon": "pa_code_logo.png",
+  "engines": {
+    "vscode": "^1.106.1"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "breakpoints": [
+      {
+        "language": "tm1"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "tm1",
+        "label": "TM1 Process Debugger",
+        "languages": [
+          "tm1"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the .ti process file to debug.",
+                "default": "${file}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop on the first line of the process.",
+                "default": true
+              },
+              "parameters": {
+                "type": "array",
+                "description": "Process parameters as [{Name, Value}] pairs.",
+                "default": []
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "tm1",
+            "request": "launch",
+            "name": "Debug TI Process",
+            "program": "${file}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "TM1: Debug TI Process",
+            "description": "Debug a TurboIntegrator process",
+            "body": {
+              "type": "tm1",
+              "request": "launch",
+              "name": "Debug ${1:Process}",
+              "program": "^\"${2:${file}}\"",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ],
+    "languages": [
+      {
+        "id": "tm1",
+        "aliases": [
+          "TurboIntegrator",
+          "TM1"
+        ],
+        "extensions": [
+          ".ti",
+          ".pro",
+          ".rux"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tm1",
+        "scopeName": "source.tm1",
+        "path": "./syntaxes/tm1.tmLanguage.json"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pa-code-sidebar",
+          "title": "PA Code",
+          "icon": "pa_code_sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "pa-code-sidebar": [
+        {
+          "id": "tm1ProcessView",
+          "name": "Connections"
+        },
+        {
+          "id": "tm1RecentItems",
+          "name": "Recently Used"
+        },
+        {
+          "id": "tm1Favorites",
+          "name": "Favorites"
+        },
+        {
+          "id": "tm1QuickActions",
+          "name": "Quick Actions"
+        },
+        {
+          "id": "tm1FunctionReference",
+          "name": "TM1 Function Reference"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "pa-code.connectTM1",
+        "title": "Connect",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "pa-code.disconnectTM1",
+        "title": "Disconnect",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "pa-code.refreshProcesses",
+        "title": "Refresh Processes",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "pa-code.createProcess",
+        "title": "Create Process",
+        "icon": "$(add)"
+      },
+      {
+        "command": "pa-code.syncFromTM1",
+        "title": "Pull All from Server",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "pa-code.searchProcesses",
+        "title": "Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "pa-code.executeProcess",
+        "title": "Execute Process",
+        "icon": "$(play)"
+      },
+      {
+        "command": "pa-code.deleteProcess",
+        "title": "Delete Process",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "pa-code.renameProcess",
+        "title": "Rename Process",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "pa-code.publishChangedFiles",
+        "title": "PA Code: Publish Changed Files",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "pa-code.toggleAutoPush",
+        "title": "PA Code: Toggle Auto-Push on Save"
+      },
+      {
+        "command": "pa-code.toggleOfflineProtection",
+        "title": "PA Code: Toggle Offline Protection (protect from Pull)",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "pa-code.manageSettings",
+        "title": "Settings",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "pa-code.viewLog",
+        "title": "View tm1server.log",
+        "icon": "$(output)"
+      },
+      {
+        "command": "pa-code.showProxyLog",
+        "title": "PA Code: Show Proxy Diagnostic Log"
+      },
+      {
+        "command": "pa-code.whatsNew",
+        "title": "PA Code: What's New"
+      },
+      {
+        "command": "pa-code.showMcpEndpoint",
+        "title": "PA Code: Show MCP Endpoint (for external AI tools)"
+      },
+      {
+        "command": "pa-code.showIntegratedLoginLog",
+        "title": "PA Code: Show Integrated Login Diagnostic Log"
+      },
+      {
+        "command": "pa-code.moveConnectionsToVSCode",
+        "title": "PA Code: Move Connections into VS Code (from tm1-project.json)"
+      },
+      {
+        "command": "pa-code.clearOAuthCredentials",
+        "title": "PA Code: Clear Stored OAuth Credentials"
+      },
+      {
+        "command": "pa-code.clearSearch",
+        "title": "Clear Search",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "pa-code.folderSearch",
+        "title": "Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "pa-code.clearFolderSearch",
+        "title": "Clear Search",
+        "icon": "$(close)"
+      },
+      {
+        "command": "pa-code.pushToTM1",
+        "title": "Push to TM1 Server",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "pa-code.gotoTM1Line",
+        "title": "Go to TM1 Line..."
+      },
+      {
+        "command": "pa-code.debugProcessByLens",
+        "title": "Debug TI Process",
+        "icon": "$(bug)"
+      },
+      {
+        "command": "pa-code.executeProcessByLens",
+        "title": "Run TI Process",
+        "icon": "$(play)"
+      },
+      {
+        "command": "pa-code.manageConfiguration",
+        "title": "Server Configuration",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "pa-code.viewThreads",
+        "title": "View Threads",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "pa-code.tiConsole",
+        "title": "TI Console (one-liner)",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "pa-code.impersonateUser",
+        "title": "Activate",
+        "category": "Impersonate",
+        "icon": "$(account)"
+      },
+      {
+        "command": "pa-code.stopImpersonating",
+        "title": "Deactivate",
+        "category": "Impersonate",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "pa-code.fileManager",
+        "title": "File Manager",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "pa-code.insertFunction",
+        "title": "Insert Function"
+      },
+      {
+        "command": "pa-code.searchFunctions",
+        "title": "Search Functions",
+        "icon": "$(search)"
+      },
+      {
+        "command": "pa-code.clearFunctionSearch",
+        "title": "Clear Search",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "pa-code.deploymentAssistant",
+        "title": "Deployment Assistant",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "pa-code.instanceHub",
+        "title": "Instance Hub",
+        "icon": "$(menu)"
+      },
+      {
+        "command": "pa-code.shortcutSearch",
+        "title": "PA Code: Search Processes"
+      },
+      {
+        "command": "pa-code.shortcutCreateProcess",
+        "title": "PA Code: New Process"
+      },
+      {
+        "command": "pa-code.shortcutPullAll",
+        "title": "PA Code: Pull All from Server"
+      },
+      {
+        "command": "pa-code.shortcutServerLog",
+        "title": "PA Code: Open Server Log"
+      },
+      {
+        "command": "pa-code.shortcutThreadViewer",
+        "title": "PA Code: Open Thread Viewer"
+      },
+      {
+        "command": "pa-code.shortcutTiConsole",
+        "title": "PA Code: Open TI Console"
+      },
+      {
+        "command": "pa-code.shortcutDeployment",
+        "title": "PA Code: Open Deployment Assistant"
+      },
+      {
+        "command": "pa-code.bulkDelete",
+        "title": "Bulk Delete",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "pa-code.securityPanel",
+        "title": "Security Manager",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "pa-code.mdxWizard",
+        "title": "MDX Wizard",
+        "icon": "$(symbol-misc)"
+      },
+      {
+        "command": "pa-code.subsetEditor",
+        "title": "Subset Editor",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "pa-code.processLineage",
+        "title": "Show Lineage (Process Call Tree)",
+        "category": "PA Code",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "pa-code.ruleLineage",
+        "title": "Show Rule Lineage (Cube)",
+        "category": "PA Code",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "pa-code.checkRuleSyntax",
+        "title": "Check Rule Syntax (no save / no feed)",
+        "category": "PA Code",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "pa-code.openCubeViewer",
+        "title": "Open in Cube Viewer",
+        "icon": "$(table)"
+      },
+      {
+        "command": "pa-code.openCubeView",
+        "title": "Open View in Cube Viewer",
+        "icon": "$(table)"
+      },
+      {
+        "command": "pa-code.addFavorite",
+        "title": "Add to Favorites",
+        "icon": "$(star)"
+      },
+      {
+        "command": "pa-code.removeFavorite",
+        "title": "Remove from Favorites",
+        "icon": "$(star-delete)"
+      },
+      {
+        "command": "pa-code.clearRecentItems",
+        "title": "Clear Recently Used",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "pa-code.executeWithLastParams",
+        "title": "Run with Last Parameters",
+        "icon": "$(run)"
+      },
+      {
+        "command": "pa-code.choreManager",
+        "title": "Chore Manager",
+        "icon": "$(clock)"
+      },
+      {
+        "command": "pa-code.processProperties",
+        "title": "PA Code: Edit Process Properties",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "pa-code.addFavoriteFromEditor",
+        "title": "Add to Favorites",
+        "icon": "$(star)"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "pa-code.impersonate",
+        "label": "Impersonate",
+        "icon": "$(account)"
+      }
+    ],
+    "menus": {
+      "pa-code.impersonate": [
+        {
+          "command": "pa-code.impersonateUser",
+          "group": "1_impersonate@1"
+        },
+        {
+          "command": "pa-code.stopImpersonating",
+          "group": "1_impersonate@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "pa-code.manageSettings",
+          "when": "view == tm1ProcessView",
+          "group": "navigation"
+        },
+        {
+          "command": "pa-code.refreshProcesses",
+          "when": "view == tm1ProcessView",
+          "group": "navigation"
+        },
+        {
+          "command": "pa-code.clearRecentItems",
+          "when": "view == tm1RecentItems",
+          "group": "navigation"
+        },
+        {
+          "command": "pa-code.searchFunctions",
+          "when": "view == tm1FunctionReference",
+          "group": "navigation"
+        },
+        {
+          "command": "pa-code.clearFunctionSearch",
+          "when": "view == tm1FunctionReference",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "pa-code.instanceHub",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "inline@1"
+        },
+        {
+          "command": "pa-code.searchProcesses",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "inline@2"
+        },
+        {
+          "command": "pa-code.clearSearch",
+          "when": "view == tm1ProcessView && viewItem == tm1instance_connected_filtered",
+          "group": "inline@3"
+        },
+        {
+          "command": "pa-code.disconnectTM1",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "inline@4"
+        },
+        {
+          "command": "pa-code.connectTM1",
+          "when": "view == tm1ProcessView && viewItem == tm1instance_disconnected",
+          "group": "inline"
+        },
+        {
+          "command": "pa-code.folderSearch",
+          "when": "view == tm1ProcessView && ((viewItem =~ /^folder_/ && viewItem != folder_control) || viewItem =~ /^control_/ || viewItem =~ /^cube_views/ || viewItem =~ /^hierarchy_subsets/)",
+          "group": "inline@1"
+        },
+        {
+          "command": "pa-code.clearFolderSearch",
+          "when": "view == tm1ProcessView && viewItem =~ /_filtered$/ && viewItem != tm1instance_connected_filtered",
+          "group": "inline@2"
+        },
+        {
+          "command": "pa-code.createProcess",
+          "when": "view == tm1ProcessView && (viewItem == folder_processes || viewItem == control_processes)",
+          "group": "inline"
+        },
+        {
+          "command": "pa-code.executeProcess",
+          "when": "view == tm1ProcessView && viewItem == tm1process",
+          "group": "inline"
+        },
+        {
+          "command": "pa-code.deleteProcess",
+          "when": "view == tm1ProcessView && viewItem == tm1process",
+          "group": "7_modification@1"
+        },
+        {
+          "command": "pa-code.renameProcess",
+          "when": "view == tm1ProcessView && viewItem == tm1process",
+          "group": "7_modification@2"
+        },
+        {
+          "command": "pa-code.syncFromTM1",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@1"
+        },
+        {
+          "command": "pa-code.viewLog",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@2"
+        },
+        {
+          "command": "pa-code.viewThreads",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@3"
+        },
+        {
+          "command": "pa-code.tiConsole",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@3"
+        },
+        {
+          "submenu": "pa-code.impersonate",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@3"
+        },
+        {
+          "command": "pa-code.manageConfiguration",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@4"
+        },
+        {
+          "command": "pa-code.deploymentAssistant",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@5"
+        },
+        {
+          "command": "pa-code.bulkDelete",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@6"
+        },
+        {
+          "command": "pa-code.securityPanel",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@7"
+        },
+        {
+          "command": "pa-code.mdxWizard",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@8"
+        },
+        {
+          "command": "pa-code.subsetEditor",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@8"
+        },
+        {
+          "command": "pa-code.choreManager",
+          "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
+          "group": "context@9"
+        },
+        {
+          "command": "pa-code.addFavorite",
+          "when": "view == tm1ProcessView && viewItem == tm1process",
+          "group": "inline@3"
+        },
+        {
+          "command": "pa-code.openCubeViewer",
+          "when": "view == tm1ProcessView && viewItem == tm1cube",
+          "group": "inline@1"
+        },
+        {
+          "command": "pa-code.openCubeViewer",
+          "when": "view == tm1ProcessView && viewItem == tm1cube",
+          "group": "context@1"
+        },
+        {
+          "command": "pa-code.processLineage",
+          "when": "view == tm1ProcessView && viewItem == tm1process",
+          "group": "context@8"
+        },
+        {
+          "command": "pa-code.ruleLineage",
+          "when": "view == tm1ProcessView && (viewItem == tm1cube || viewItem == tm1rule)",
+          "group": "context@2"
+        },
+        {
+          "command": "pa-code.removeFavorite",
+          "when": "view == tm1Favorites",
+          "group": "inline"
+        },
+        {
+          "command": "pa-code.executeWithLastParams",
+          "when": "view == tm1RecentItems && viewItem == recentItem_hasParams",
+          "group": "inline"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "pa-code.pushToTM1",
+          "when": "resourceExtname == .ti",
+          "group": "2_workspace"
+        },
+        {
+          "command": "pa-code.toggleOfflineProtection",
+          "when": "resourceExtname == .ti || resourceExtname == .rux",
+          "group": "2_workspace@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "pa-code.checkRuleSyntax",
+          "when": "resourceExtname == .rux",
+          "group": "9_pacode@0"
+        },
+        {
+          "command": "pa-code.toggleOfflineProtection",
+          "when": "resourceExtname == .ti || resourceExtname == .rux",
+          "group": "9_pacode@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "pa-code.executeProcessByLens",
+          "when": "resourceExtname == .ti",
+          "group": "navigation@1"
+        },
+        {
+          "command": "pa-code.debugProcessByLens",
+          "when": "resourceExtname == .ti",
+          "group": "navigation@2"
+        },
+        {
+          "command": "pa-code.processProperties",
+          "when": "resourceExtname == .ti",
+          "group": "navigation@3"
+        },
+        {
+          "command": "pa-code.addFavoriteFromEditor",
+          "when": "resourceExtname == .ti || resourceExtname == .rux",
+          "group": "navigation@4"
+        },
+        {
+          "command": "pa-code.checkRuleSyntax",
+          "when": "resourceExtname == .rux",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "pa-code.shortcutSearch",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f"
+      },
+      {
+        "command": "pa-code.shortcutCreateProcess",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n"
+      },
+      {
+        "command": "pa-code.shortcutPullAll",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
+      },
+      {
+        "command": "pa-code.shortcutServerLog",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l"
+      },
+      {
+        "command": "pa-code.shortcutThreadViewer",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t"
+      },
+      {
+        "command": "pa-code.shortcutDeployment",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d"
+      },
+      {
+        "command": "pa-code.shortcutTiConsole",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c"
+      }
+    ],
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "comment.line.number-sign.tm1",
+            "settings": {
+              "foreground": "#6A9955"
+            }
+          },
+          {
+            "scope": "entity.name.function.tm1",
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
+          },
+          {
+            "scope": "string.quoted.single.tm1",
+            "settings": {
+              "foreground": "#CE9178"
+            }
+          },
+          {
+            "scope": "keyword.control.tm1",
+            "settings": {
+              "foreground": "#C586C0"
+            }
+          },
+          {
+            "scope": "variable.language.tm1",
+            "settings": {
+              "foreground": "#569CD6"
+            }
+          }
+        ]
+      }
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "paCodeTm1Mcp",
+        "label": "pa-code TM1 Model"
+      }
+    ],
+    "configuration": {
+      "title": "PA Code",
+      "properties": {
+        "pa-code.mcpServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Provide a real MCP server (Tools + Resources + Prompts) backed by the live TM1 connection. Exposes read-only TM1 tools, tm1:// resources (process code, cube rules, cube dimensions, server info) and reusable prompts (explain process, review rules, impact analysis). Available to the built-in Copilot agent AND to any other MCP-aware AI tool (Claude Code/Desktop, Codex, Cline, Continue, …) via 'PA Code: Show MCP Endpoint'. Read-only by default; opt into write / model-building tools with 'pa-code.mcpServer.mode'."
+        },
+        "pa-code.mcpServer.port": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Fixed loopback port for the MCP server. 0 (default) lets the OS assign a random port each session (fine for the Copilot agent). Set a fixed port (e.g. 3900) for a stable URL when connecting external AI tools such as Claude Code/Desktop, Codex, Cline or Continue. The server always binds to 127.0.0.1 only."
+        },
+        "pa-code.mcpServer.autoStart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start the MCP server immediately when the extension activates, instead of lazily on first use. Enable this when an external AI tool (e.g. Codex) connects on its own and needs the loopback endpoint to be listening right away — without waiting for VS Code/Copilot to request the server first. Best combined with a fixed 'Port'."
+        },
+        "pa-code.mcpServer.tokenEnvVar": {
+          "type": "string",
+          "default": "",
+          "description": "Name of an environment variable that holds the MCP bearer token. When set (and the variable is non-empty), the server uses that token instead of the auto-generated one stored in SecretStorage. This lets an external client that reads the token from an env var (e.g. Codex's '--bearer-token-env-var') share the exact same token. Example: PA_CODE_MCP_TOKEN. Leave empty to use the built-in persisted token."
+        },
+        "pa-code.mcpServer.mode": {
+          "type": "string",
+          "enum": ["readonly", "readwrite"],
+          "enumDescriptions": [
+            "Only read tools are exposed. The agent can inspect the model but cannot change anything.",
+            "Adds write / model-building tools (create & delete cubes, dimensions, elements, edges, rules, TI processes, views, subsets, chores, security; write cells; execute processes/chores). Destructive tools require a confirm argument."
+          ],
+          "default": "readonly",
+          "markdownDescription": "MCP server capability level. **readonly** (default) exposes only read tools. **readwrite** additionally exposes write / model-building tools so an AI agent can create and manipulate TM1 objects (e.g. build a full model from a spreadsheet). Destructive actions (all deletes, cell writes, rule replacement, process/chore execution, config changes) require a `confirm` argument that repeats the target name. Only point a read/write server at a database whose account has the rights the agent should have."
+        },
+        "pa-code.integratedLogin.kerberosSpn": {
+          "type": "string",
+          "default": "",
+          "description": "Optional explicit Kerberos service principal name (SPN) for Integrated Login. Leave empty (default) to derive it automatically as HTTP/<server-FQDN>. Set this only if auto-detection fails — e.g. 'HTTP/tm1host.corp.example.com' — to match exactly the SPN registered in Active Directory (setspn -S HTTP/<fqdn> <account>). Applies to all Integrated Login connections."
+        },
+        "pa-code.projectFile.location": {
+          "type": "string",
+          "default": "",
+          "description": "Legacy only: where to store the 'tm1-project.json' file when you keep file-based connections. Empty (default) uses the workspace root. Set a folder (e.g. your non-git Local Workspace Folder) or a full path ending in '.json'. New connections are stored in VS Code by default and do not create this file; see 'PA Code: Move Connections into VS Code'."
+        },
+        "pa-code.connections.defaultScope": {
+          "type": "string",
+          "enum": [
+            "workspace",
+            "global"
+          ],
+          "enumDescriptions": [
+            "Store new connections for this VS Code workspace only.",
+            "Store new connections globally, so they are available in every workspace for your user."
+          ],
+          "default": "workspace",
+          "description": "Where new connections are saved when no scope is chosen. Connections are stored in VS Code (not in a file). Use 'global' to reuse the same connections across different workspaces. Each connection's scope can also be changed in the connection editor."
+        },
+        "pa-code.autoPushOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled (default), saving a .ti / .rux file pushes it to the connected TM1 server. Turn it off to work in a manual-publish workflow: edits stay local (and can be committed to git) until you run 'PA Code: Publish Changed Files'. Toggle via the 'TM1: Auto-Push' status bar item."
+        },
+        "pa-code.auth.privateBrowserWindow": {
+          "type": "boolean",
+          "default": false,
+          "description": "For CAM Browser SSO: open the login browser in a private/incognito window (Chrome --incognito / Edge --inprivate). Useful to bypass an existing SSO session and sign in as a different account (e.g. an admin on a production instance), instead of being auto-logged-in with your saved credentials."
+        },
+        "pa-code.delight.celebrateProcessSuccess": {
+          "type": "boolean",
+          "default": false,
+          "description": "Delightful UX (off by default): after a TI process runs successfully, play a short celebration. Choose the style with 'pa-code.delight.celebrationStyle'."
+        },
+        "pa-code.delight.celebrationStyle": {
+          "type": "string",
+          "enum": [
+            "balloons",
+            "fireworks",
+            "panel"
+          ],
+          "enumDescriptions": [
+            "Animated toast with rising balloons, then a persistent success message.",
+            "Animated toast with rockets and a burst, then a persistent success message.",
+            "A short-lived panel beside the editor with floating balloons (inspired by Streamlit's st.balloons)."
+          ],
+          "default": "balloons",
+          "description": "How to celebrate a successful process run when 'pa-code.delight.celebrateProcessSuccess' is on."
+        },
+        "pa-code.delight.funMessages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Delightful UX (on by default): use a random cheerful phrase (e.g. 'Nailed it! 🎯', 'Clean run ✨') for the process-success message instead of the standard text."
+        },
+        "pa-code.delight.dailyGreeting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Delightful UX (on by default): show a short, time-of-day greeting the first time you connect to a TM1 server each day."
+        },
+        "pa-code.delight.progressPersonality": {
+          "type": "boolean",
+          "default": true,
+          "description": "Delightful UX (on by default): use playful progress messages during 'Pull All' (e.g. 'Fetching your processes… 🧰') instead of the plain text."
+        },
+        "pa-code.deployment.logEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable deployment transport logging. When enabled, each deployment writes a JSON log file."
+        },
+        "pa-code.deployment.logDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Directory for deployment transport log files. Absolute path or relative to workspace root."
+        },
+        "pa-code.proxy.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable proxy diagnostic logging. When enabled, every request logs its DIRECT/PROXY routing decision to the 'PA Code (Proxy)' output channel. Use the command 'PA Code: Show Proxy Diagnostic Log' to view it."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.106.1",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.9.1",
+    "eslint": "^9.39.1",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.3",
+    "webpack": "^5.102.1",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "axios-ntlm": "^1.4.6",
+    "http-proxy-agent": "^5.0.0",
+    "https-proxy-agent": "^5.0.1",
+    "kerberos": "^7.0.0",
+    "puppeteer-core": "^24.43.1"
+  }
+}

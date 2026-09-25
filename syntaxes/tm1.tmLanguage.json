@@ -1,0 +1,83 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "TurboIntegrator",
+    "patterns": [
+        {
+            "comment": "Rule area definition (e.g. ['Sales', 'Jan'])",
+            "match": "\\[[^\\]]*\\]",
+            "name": "variable.parameter.tm1"
+        },
+        {
+            "comment": "Rule side definition (!Dimension)",
+            "match": "![a-zA-Z0-9_àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿßÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ ]+",
+            "name": "variable.language.tm1"
+        },
+        {
+            "comment": "Rule qualifiers (N:, C:, S:)",
+            "match": "\\b(?i)(N|C|S):",
+            "name": "keyword.control.tm1"
+        },
+        {
+            "comment": "Rule section keywords",
+            "match": "\\b(?i)(FEEDERS|SKIPCHECK|FEEDSTRINGS)\\b",
+            "name": "keyword.control.tm1"
+        },
+        {
+            "comment": "Section markers (#SECTION must come before the generic comment rule)",
+            "match": "^#SECTION.*",
+            "name": "comment.line.number-sign.tm1"
+        },
+        {
+            "comment": "JSON properties block marker",
+            "match": "^#JSON_PROPERTIES.*",
+            "name": "comment.line.number-sign.tm1"
+        },
+        {
+            "comment": "TM1 generated block markers",
+            "match": "^#\\*+.*",
+            "name": "comment.line.number-sign.tm1"
+        },
+        {
+            "comment": "Comments (everything after a standalone #)",
+            "match": "#.*",
+            "name": "comment.line.number-sign.tm1"
+        },
+        {
+            "comment": "Strings (single quotes)",
+            "begin": "'",
+            "end": "'",
+            "name": "string.quoted.single.tm1"
+        },
+        {
+            "comment": "Numbers",
+            "match": "\\b\\d+(\\.\\d+)?\\b",
+            "name": "constant.numeric.tm1"
+        },
+        {
+            "comment": "Control flow and Rule keywords",
+            "match": "\\b(?i)(IF|ELSE|ELSEIF|ENDIF|WHILE|END|FOR|NEXT|BREAK|RETURN|CONTINUE|STET|UNDEFVALS)\\b",
+            "name": "keyword.control.tm1"
+        },
+        {
+            "comment": "Operators",
+            "match": "(@=|@<>|@<|@>|<>|<=|>=|<|>|=|\\+|-|\\*|\\/|&|\\|)",
+            "name": "keyword.operator.tm1"
+        },
+        {
+            "comment": "All TM1 / Rules / TurboIntegrator functions",
+            "match": "\\b(?i)(AsciiOutput|TextOutput|Char|Code|Delet|Expand|Fill|Insrt|Long|Lower|Upper|Trim|Scan|Subst|NumberToString|NumberToStringEx|StringToNumber|StringToNumberEx|AttrDelete|AttrInsert|AttrGetN|AttrGetS|AttrPutN|AttrPutS|ATTRS|ATTRN|ElementAttrDelete|ElementAttrInsert|ElementAttrN|ElementAttrS|ElementAttrPutN|ElementAttrPutS|ChoreAdd|ChoreClear|ChoreQuit|CellGetN|CellGetS|CellIncrementN|CellPutN|CellPutS|CellPutProportionalSpread|CellIsUpdateable|CellIsUpdateableEx|CellSecurityGet|CubeClearData|CubeCreate|CubeDestroy|CubeExists|CubeGetLogChanges|CubeSetLogChanges|CubeProcessFeeders|CubeSaveData|CubeElementInsert|HierarchyCount|HierarchyCreate|HierarchyDestroy|HierarchyExists|HierarchyElementInsert|HierarchyElementDelete|HierarchyElementComponentAdd|HierarchyElementComponentDelete|DimensionCreate|DimensionDestroy|DimensionDeleteAllElements|DimensionElementComponentAdd|DimensionElementComponentDelete|DimensionElementDelete|DimensionElementInsert|DimensionElementInsertDirect|DimensionElementPrincipalName|DimensionExists|DimensionSortOrder|DimensionTopElementCount|Dimix|Dimnm|Dimsiz|DIMIX|DIMNM|DIMSIZ|Elcomp|ElcompN|Elisleav|Elpar|ElparN|ELCOMP|ELCOMPN|ELLEV|ELISANC|ELISCOMP|ELISPAR|ELWEIGHT|DTYPE|SubsetAliasSet|SubsetCreate|SubsetCreateByMDX|SubsetDeleteAllElements|SubsetDestroy|SubsetElementDelete|SubsetElementInsert|SubsetExists|SubsetGetElementName|SubsetGetSize|SubsetMDXGet|SubsetMDXSet|SubsetToSet|ViewColumnDimensionSet|ViewCreate|ViewDestroy|ViewExists|ViewExtractSkipCalcsSet|ViewExtractSkipRuleValuesSet|ViewExtractSkipZeroesSet|ViewExtractSkipConsolidatedValuesSet|ViewExtractSkipConsolidatedStringsSet|AddCubeDependency|AddInfoCubeRestriction|ASCIIDelete|ASCIIOutputOpen|AssociateCAMIDToGroup|ATTRNL|ATTRSL|BatchUpdateFinish|BatchUpdateFinishWait|CellSecurityCubeCreate|CellSecurityCubeDestroy|ChoreAttrDelete|ChoreAttrInsert|ChoreAttrN|ChoreAttrNL|ChoreAttrPutN|ChoreAttrPutS|ChoreAttrS|ChoreAttrSL|ChoreError|ChoreRollback|CreateHierarchyByAttribute|CubeAttrDelete|CubeAttrInsert|CubeATTRNL|CubeAttrPutN|CubeAttrPutS|CubeATTRSL|CubeDataReservationAcquire|CubeDataReservationGet|CubeDataReservationGetConflicts|CubeDataReservationRelease|CubeDataReservationReleaseAll|CubeDimensionCountGet|CubeRuleAppend|CubeRuleDestroy|CubeRuleGet|CubeRuleSet|CubeSetConnParams|CubeTimeLastUpdated|CubeUnload|DeleteAllPersistentFeeders|DimensionAttrDelete|DimensionAttrInsert|DimensionATTRNL|DimensionAttrPutN|DimensionAttrPutS|DimensionATTRSL|DimensionDeleteElements|DimensionElementComponentAddDirect|DimensionElementComponentDeleteDirect|DimensionElementDeleteDirect|DimensionElementExists|DimensionHierarchyCreate|DimensionTimeLastUpdated|DimensionTopElementInsert|DimensionTopElementInsertDirect|DimensionUpdateDirect|DisableBulkLoadMode|DisableMTQViewConstruct|ElementATTRNL|ElementATTRSL|EnableBulkLoadMode|EnableMTQViewConstruct|ForceSkipCheck|FormatDate|GetProcessErrorFileDirectory|GetProcessErrorFilename|GetUseActiveSandboxProperty|HierarchyAttrPutN|HierarchyAttrPutS|HierarchyATTRN|HierarchyATTRNL|HierarchyATTRS|HierarchyATTRSL|HierarchyContainsAllLeaves|HierarchyDeleteAllElements|HierarchyDeleteElements|HierarchyElementComponentAddDirect|HierarchyElementComponentDeleteDirect|HierarchyElementDeleteDirect|HierarchyElementExists|HierarchyElementInsertDirect|HierarchyElementPrincipalName|HierarchyElementSecurityGet|HierarchyElementSecurityPut|HierarchyHasOrphanedLeaves|HierarchySortOrder|HierarchySubsetAliasGet|HierarchySubsetAliasSet|HierarchySubsetATTRN|HierarchySubsetATTRNL|HierarchySubsetAttrDelete|HierarchySubsetAttrInsert|HierarchySubsetAttrPutN|HierarchySubsetAttrPutS|HierarchySubsetATTRS|HierarchySubsetATTRSL|HierarchySubsetCreate|HierarchySubsetDeleteAllElements|HierarchySubsetDestroy|HierarchySubsetElementDelete|HierarchySubsetElementExists|HierarchySubsetElementGetIndex|HierarchySubsetElementInsert|HierarchySubsetExists|HierarchySubsetGetElementName|HierarchySubsetGetSize|HierarchySubsetIsAllSet|HierarchySubsetMDXGet|HierarchySubsetMDXSet|HierarchyTimeLastUpdated|HierarchyTopElementInsert|HierarchyTopElementInsertDirect|HierarchyUpdateDirect|NewDateFormatter|ODBCOPENEx|ODBCOutput|ParseDate|ProcessAttrDelete|ProcessAttrInsert|ProcessAttrN|ProcessAttrNL|ProcessAttrPutN|ProcessAttrPutS|ProcessAttrS|ProcessAttrSL|ProcessExists|ProcessExitByChoreRollback|ProcessExitByProcessRollback|ProcessRollback|PublishSubset|RefreshMdxHierarchy|RemoveCAMIDAssociation|RemoveCAMIDAssociationFromGroup|RemoveClientFromGroup|RuleLoadFromFile|RuleLoadFromFileEx|RunProcess|SecurityOverlayCreateGlobalDefault|SecurityOverlayDestroyGlobalDefault|SecurityOverlayGlobalLockCell|SecurityOverlayGlobalLockNode|ServerActiveSandboxGet|ServerActiveSandboxSet|ServerSandboxClone|ServerSandboxCreate|ServerSandboxDiscardAllChanges|ServerSandboxesDelete|ServerSandboxExists|ServerSandboxGet|ServerSandboxListCountGet|ServerSandboxMerge|SetChoreVerboseMessages|SetDimensionGroupsSecurity|SetElementGroupsSecurity|SetHierarchyElementGroupsSecurity|SetHierarchyGroupsSecurity|SetODBCUnicodeInterface|SetOutputEscapeDoubleQuote|SetUseActiveSandboxProperty|SubsetAliasGet|SubsetATTRN|SubsetATTRNL|SubsetAttrDelete|SubsetAttrInsert|SubsetAttrPutN|SubsetAttrPutS|SubsetATTRS|SubsetATTRSL|SubsetElementExists|SubsetElementGetIndex|SubsetExpandAboveSet|SubsetFormatStyleSet|SubsetIsAllSet|TM1User|ViewAttrDelete|ViewAttrInsert|ViewAttrN|ViewAttrNL|ViewAttrPutN|ViewAttrPutS|ViewAttrS|ViewAttrSL|ViewConstruct|ViewCreateByMDX|ViewExtractFilterByTitlesSet|ViewMDXGet|ViewMDXSet|ViewSuppressZeroesSet|ACOS|ASIN|ATAN|CellValueN|CellValueS|CODEW|ConsolidatedAvg|ConsolidatedCount|ConsolidatedCountUnique|ConsolidatedMax|ConsolidatedMin|CubeATTRN|CubeATTRS|DATE|DATES|DAY|DimensionATTRN|DimensionATTRS|DNEXT|DNLEV|ElementFirst|ElementIsComponent|ElementNext|FV|Hierarchy|HierarchyIndex|HierarchyN|INT|ISLEAF|ISUND|ISUNDEFINEDCELLVALUE|LevelCount|LN|MONTH|PAYMT|PV|RAND|TABDIM|TIME|TODAY|UNDEF|UNDEFINEDCELLVALUE|YEAR|ViewRowDimensionSet|ViewRowSuppressZeroesSet|ViewColumnSuppressZeroesSet|ViewSubsetAssign|ViewTitleDimensionSet|ViewTitleElementSet|ViewZeroOut|PublishView|NativeViewToMDX|Break|ExecuteCommand|ExecuteProcess|ItemReject|ItemSkip|ProcessBreak|ProcessError|ProcessQuit|Return|SetInputCharacterSet|SetOutputCharacterSet|Sleep|Synchronized|AddClient|AddGroup|AssignClientPassword|AssignClientToGroup|DeleteClient|DeleteGroup|CubeSecurityPut|DimensionSecurityPut|ElementSecurityPut|SecurityRefresh|Now|Timst|Timvl|DayNo|ODBCOpen|ODBCQuery|ODBCClose|ODBCExecute|ODBCFetch|ODBCPut|ODBCEOF|ODBCError|LogOutput|SaveDataAll|SetUseActiveDirectory|DBR|DBS|DBSS|FileExists|WildcardFileSearch|GetProcessName|ServerRestart|ServerShutdown|ServerLogger|SwapAliasWithPrincipalName|DatasourceQuery|DimensionElementComponentAdd|ElementCount|ElementIndex|ElementName|ElementType|ElementLevel|ElementAscend|ElementDescend|ElementComponentCount|ElementComponent|ElementComponentWeight|ElementIsAncestor|ElementIsParent|ElementIsChild|ElementIsSibling|ElementSecurityGet|ElementParentCount|ElementParent|ElementWeight|ConsolidateChildren|DB|ABS|MAX|MIN|MOD|ROUND|ROUNDP|SIGN|SQRT|EXP|LOG|SIN|COS|TAN|CAPIT|LOWER|UPPER|SUBST|TRIM|STR|NUMBR|INSRT|NOW|DAYNO|TIMST|TIMVL)\\b",
+            "name": "entity.name.function.tm1"
+        },
+        {
+            "comment": "System variables / datasource fields",
+            "match": "\\b(?i)(DatasourceType|DatasourceNameForClient|DatasourceNameForServer|DatasourceASCIIDelimiter|DatasourceASCIIQuoteCharacter|DatasourceASCIIHeaderRecords|DatasourceView|DatasourceCube|OnMinorErrorDo|OnMajorErrorDo|NValue|SValue|DataSourceLineCount|DataSourceLineCountOk|DataSourceLineCountKo)\\b",
+            "name": "variable.language.tm1"
+        },
+        {
+            "comment": "Generic Variables (matches any word that wasn't matched above)",
+            "match": "\\b[a-zA-Z_àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿßÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ][a-zA-Z0-9_àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿßÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ]*\\b",
+            "name": "variable.language.tm1"
+        }
+    ],
+    "scopeName": "source.tm1"
+}
