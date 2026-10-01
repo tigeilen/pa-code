@@ -296,7 +296,10 @@ export class DeploymentPanel {
         }
 
         if (failed === 0) {
-            vscode.window.showInformationMessage(`Deployment complete: ${succeeded} object(s) deployed successfully. Local files updated.`);
+            // Only mention local files when the target actually stores them.
+            const envConfig = ConfigManager.getConfig().environments?.find((e: any) => targetInstance.startsWith(e.name + '_'));
+            const wroteFiles = succeeded > 0 && envConfig?.storeFilesLocally !== false;
+            vscode.window.showInformationMessage(`Deployment complete: ${succeeded} object(s) deployed successfully.${wroteFiles ? ' Local files updated.' : ''}`);
         } else {
             vscode.window.showWarningMessage(`Deployment complete: ${succeeded} succeeded, ${failed} failed.`);
         }
@@ -328,6 +331,9 @@ export class DeploymentPanel {
         // Parse instanceName: "environmentName_serverRealName"
         const envConfig = config.environments?.find((e: any) => targetInstance.startsWith(e.name + '_'));
         if (!envConfig) return;
+        // Respect the per-environment "store files locally" setting — browse-only
+        // targets must not get files written on deploy.
+        if (envConfig.storeFilesLocally === false) return;
         const serverRealName = targetInstance.substring(envConfig.name.length + 1);
         const baseDir = path.join(rootPath, envConfig.folder, serverRealName);
 

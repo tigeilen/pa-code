@@ -4,6 +4,11 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.1] - 2026-09-24
+
+### Fixes
+- **Deployment Assistant respects "store files locally"** — when a target environment is configured not to store files locally (browse-only), the Deployment Assistant no longer writes/updates local `.ti`/`.rux` files after a deployment. The completion message also omits the "Local files updated" note for such targets.
+
 ## [3.8.0] - 2026-09-24
 
 **First open-source release** — PA Code is now developed in the open under the Apache License 2.0. 🎉
