@@ -402,7 +402,7 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
                     <p>PA Code is now open source under the Apache License 2.0 — plus little moments of joy (celebrate successful runs) and a batch of feedback fixes for the TI Console, rule check and lineage.</p>
                 </div>
                 <div class="card feature">
-                    <h2><span class="emoji">�</span> Now open source (Apache-2.0)</h2>
+                    <h2><span class="emoji">🔓</span> Now open source (Apache-2.0)</h2>
                     <p class="sub">A community project you and your company can review, adopt and contribute to</p>
                     <ul>
                         <li>PA Code is now developed in the open under the <strong>Apache License 2.0</strong> — permissive, enterprise-friendly, with an explicit patent grant.</li>
@@ -410,7 +410,7 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
                     </ul>
                 </div>
                 <div class="card feature">
-                    <h2><span class="emoji">�🎈</span> Celebrate a successful process</h2>
+                    <h2><span class="emoji">🎈</span> Celebrate a successful process</h2>
                     <p class="sub">Inspired by Streamlit's <code>st.balloons</code> — opt-in via <code>pa-code.delight.celebrateProcessSuccess</code></p>
                     <ul>
                         <li>When a TI process finishes successfully, a short <strong>animated toast</strong> plays and then leaves a <strong>persistent</strong> success message.</li>

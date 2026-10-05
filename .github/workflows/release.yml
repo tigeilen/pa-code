@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, package & publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run package
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Package VSIX
+        run: npx --yes @vscode/vsce package -o pa-code-${{ steps.version.outputs.version }}.vsix
+
+      - name: Extract changelog notes
+        id: notes
+        run: |
+          node .github/scripts/extract-changelog.mjs "${{ steps.version.outputs.version }}" > release-notes.md || true
+          if [ ! -s release-notes.md ]; then
+            echo "See CHANGELOG.md for details." > release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: PA Code ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: pa-code-${{ steps.version.outputs.version }}.vsix
+          fail_on_unmatched_files: true
