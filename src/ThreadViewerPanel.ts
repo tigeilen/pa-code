@@ -26,6 +26,9 @@ export class ThreadViewerPanel {
                     case 'cancelThread':
                         await this._cancelThread(message.threadId);
                         return;
+                    case 'disconnectThread':
+                        await this._disconnectThread(message.threadId);
+                        return;
                 }
             },
             null,
@@ -77,6 +80,22 @@ export class ThreadViewerPanel {
             await this._sendThreadsToWebview();
         } catch (err: any) {
             vscode.window.showErrorMessage(`Failed to cancel thread ${threadId}: ${err.message}`);
+        }
+    }
+
+    private async _disconnectThread(threadId: string | number) {
+        const confirm = await vscode.window.showWarningMessage(
+            `Disconnect the user session that owns thread ${threadId}?`,
+            { modal: true, detail: 'This closes the entire TM1 session for that user (not just the current operation). Any unsaved work in their session is lost.' },
+            'Disconnect Session'
+        );
+        if (confirm !== 'Disconnect Session') return;
+        try {
+            const res = await TM1Service.getInstance().disconnectThreadSession(this._instanceName, threadId);
+            vscode.window.showInformationMessage(`Session ${res.session}${res.user ? ` (${res.user})` : ''} disconnected.`);
+            await this._sendThreadsToWebview();
+        } catch (err: any) {
+            vscode.window.showErrorMessage(`Failed to disconnect session for thread ${threadId}: ${err.message}`);
         }
     }
 
@@ -246,6 +265,21 @@ export class ThreadViewerPanel {
             background: var(--vscode-errorForeground, #f44747);
             color: #fff;
         }
+        .btn-row-disconnect {
+            background: transparent;
+            color: var(--vscode-charts-yellow, #cca700);
+            border: 1px solid var(--vscode-charts-yellow, #cca700);
+            padding: 2px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 4px;
+        }
+        .btn-row-disconnect:hover {
+            background: var(--vscode-charts-yellow, #cca700);
+            color: #000;
+        }
         .refresh-indicator {
             display: inline-block;
             width: 8px;
@@ -388,13 +422,18 @@ export class ThreadViewerPanel {
                     '<td>' + locks + '</td>' +
                     '<td title="' + escapeHtml(t.Context || '') + '">' + escapeHtml(t.Context || '') + '</td>' +
                     '<td title="' + escapeHtml(t.Info || '') + '">' + escapeHtml(t.Info || '') + '</td>' +
-                    '<td><button class="btn-row-kill" onclick="killThread(\\''+t.ID+'\\')">\\u2716 Kill</button></td>' +
+                    '<td><button class="btn-row-kill" onclick="killThread(\\''+t.ID+'\\')">\\u2716 Kill</button>' +
+                    '<button class="btn-row-disconnect" onclick="disconnectThread(\\''+t.ID+'\\')">\\u2702 Disconnect</button></td>' +
                     '</tr>';
             }).join('');
         }
 
         function killThread(threadId) {
             vscode.postMessage({ command: 'cancelThread', threadId: threadId });
+        }
+
+        function disconnectThread(threadId) {
+            vscode.postMessage({ command: 'disconnectThread', threadId: threadId });
         }
 
         function killThreadById() {

@@ -368,11 +368,22 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
             viewsFolder.iconPath = new vscode.ThemeIcon('table');
             const vFilt = this.getFolderFilter(element.instanceName, ProcessProvider.viewsFilterKey(cubeName));
             if (vFilt) { viewsFolder.contextValue = 'cube_views_filtered'; viewsFolder.description = `(Filtered: ${vFilt})`; }
-            const rulesItem = new TM1TreeItem(cubeName, vscode.TreeItemCollapsibleState.None, 'view', element.environmentName, element.instanceName, 'tm1rule', undefined, undefined, cubeName);
-            rulesItem.iconPath = new vscode.ThemeIcon('symbol-ruler');
-            rulesItem.description = 'Rules';
-            rulesItem.command = { command: 'pa-code.openRule', title: 'Open Rule', arguments: [element.environmentName, element.instanceName, cubeName] };
-            return [dimsFolder, viewsFolder, rulesItem];
+            const children: TM1TreeItem[] = [dimsFolder, viewsFolder];
+            // Only show a Rule node when the cube actually HAS a rule. Showing it
+            // unconditionally made every cube look rule-bearing and caused an empty
+            // .rux to be written on open (which then landed in Git). Right-click the
+            // cube → "Create Rule" to add one when none exists.
+            try {
+                const rule = await tm1.getRuleContent(element.instanceName, cubeName);
+                if (rule && rule.trim().length > 0) {
+                    const rulesItem = new TM1TreeItem(cubeName, vscode.TreeItemCollapsibleState.None, 'view', element.environmentName, element.instanceName, 'tm1rule', undefined, undefined, cubeName);
+                    rulesItem.iconPath = new vscode.ThemeIcon('symbol-ruler');
+                    rulesItem.description = 'Rules';
+                    rulesItem.command = { command: 'pa-code.openRule', title: 'Open Rule', arguments: [element.environmentName, element.instanceName, cubeName] };
+                    children.push(rulesItem);
+                }
+            } catch { /* can't determine rule state — don't show a phantom Rule node */ }
+            return children;
         }
 
         // LEVEL 5: SUBFOLDER CONTENTS

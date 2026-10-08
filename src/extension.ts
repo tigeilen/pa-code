@@ -782,6 +782,10 @@ export function activate(context: vscode.ExtensionContext) {
         await vscode.window.showTextDocument(doc, { preview: false });
     };
 
+    // Paths we delete/rename ourselves (deleteProcess, rename). The local-delete
+    // watcher must ignore these so it doesn't ask to delete on the server again.
+    const suppressDeleteWatch = new Set<string>();
+
     // --- COMMAND: OPEN PROCESS ---
     let openProcessCmd = vscode.commands.registerCommand('pa-code.openProcess', async (environmentName: string, instanceName: string, processName: string) => {
         try {
@@ -894,7 +898,7 @@ export function activate(context: vscode.ExtensionContext) {
                 if (envConfig && vscode.workspace.workspaceFolders) {
                     const rootPath = vscode.workspace.workspaceFolders[0].uri.fsPath;
                     const filePath = path.join(rootPath, envConfig.folder, serverRealName, 'Processes', `${processName}.ti`);
-                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                    if (fs.existsSync(filePath)) { suppressDeleteWatch.add(filePath); fs.unlinkSync(filePath); }
                 }
             } catch { /* ignore local cleanup errors */ }
             processBaseline.clear('process', instanceName, processName);
@@ -960,6 +964,7 @@ export function activate(context: vscode.ExtensionContext) {
                         for (const sub of ['Processes', 'Control Processes']) {
                             const oldFile = path.join(root, envConfig.folder, serverRealName, sub, `${oldName}.ti`);
                             if (fs.existsSync(oldFile)) {
+                                suppressDeleteWatch.add(oldFile);
                                 fs.renameSync(oldFile, path.join(path.dirname(oldFile), `${target}.ti`));
                                 break;
                             }
@@ -990,6 +995,71 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage(`Rename failed: ${e.message}`);
             }
         });
+    });
+
+    // --- LOCAL .ti DELETE WATCHER ---
+    // When a process file is deleted locally (e.g. in the Explorer), offer to
+    // delete the matching process on the server too. Deletions we trigger
+    // ourselves (deleteProcess / rename) are suppressed. Bulk deletes (e.g. a Git
+    // branch switch) are batched into one prompt and default to keeping the
+    // server objects, so nothing is removed without an explicit confirmation.
+    const pendingDeletes = new Map<string, { instanceId: string; name: string; fsPath: string }>();
+    let deleteBatchTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const flushPendingDeletes = async () => {
+        const items = [...pendingDeletes.values()];
+        pendingDeletes.clear();
+        // Only act on processes whose instance is currently connected (we can't
+        // delete on a server we're not talking to).
+        const actionable = items.filter(it => TM1Service.getInstance().isConnected(it.instanceId));
+        if (actionable.length === 0) return;
+
+        let confirmed: typeof actionable;
+        if (actionable.length === 1) {
+            const it = actionable[0];
+            const choice = await vscode.window.showWarningMessage(
+                `Local file for process "${it.name}" was deleted. Also delete it on ${it.instanceId}?`,
+                { modal: true, detail: 'This permanently removes the process from the TM1 server and cannot be undone.' },
+                'Delete on Server'
+            );
+            confirmed = choice === 'Delete on Server' ? actionable : [];
+        } else {
+            const list = actionable.map(it => `\u2022 ${it.name} (${it.instanceId})`).join('\n');
+            const choice = await vscode.window.showWarningMessage(
+                `${actionable.length} local process files were deleted. Also delete these processes on the server?`,
+                { modal: true, detail: `This permanently removes them from TM1 and cannot be undone.\n\n${list}` },
+                'Delete All on Server'
+            );
+            confirmed = choice === 'Delete All on Server' ? actionable : [];
+        }
+        if (confirmed.length === 0) return;
+
+        let ok = 0;
+        for (const it of confirmed) {
+            try {
+                await TM1Service.getInstance().deleteProcess(it.instanceId, it.name);
+                processBaseline.clear('process', it.instanceId, it.name);
+                processBaseline.setOffline('process', it.instanceId, it.name, false);
+                ok++;
+            } catch (e: any) {
+                vscode.window.showErrorMessage(`Failed to delete '${it.name}' on ${it.instanceId}: ${e.message}`);
+            }
+        }
+        if (ok > 0) {
+            processProvider.refresh();
+            vscode.window.showInformationMessage(`${ok} process(es) deleted on the server.`);
+        }
+    };
+
+    const tiDeleteWatcher = vscode.workspace.createFileSystemWatcher('**/*.ti');
+    tiDeleteWatcher.onDidDelete(uri => {
+        const fsPath = uri.fsPath;
+        if (suppressDeleteWatch.has(fsPath)) { suppressDeleteWatch.delete(fsPath); return; }
+        const target = resolveSyncTarget(fsPath);
+        if (!target || target.kind !== 'process') return;
+        pendingDeletes.set(fsPath, { instanceId: target.instanceId, name: target.name, fsPath });
+        if (deleteBatchTimer) clearTimeout(deleteBatchTimer);
+        deleteBatchTimer = setTimeout(() => { void flushPendingDeletes(); }, 500);
     });
 
     // --- COMMAND: PUBLISH CHANGED FILES (manual push of all pending .ti/.rux) ---
@@ -1508,6 +1578,19 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             const content = await TM1Service.getInstance().getRuleContent(instanceName, cubeName);
+            // No rule on the server: never write an empty .rux (it would land in Git
+            // as a phantom object). Offer to create one instead.
+            if ((!content || content.trim().length === 0) && !localExists) {
+                const choice = await vscode.window.showInformationMessage(
+                    `Cube "${cubeName}" has no rule yet.`,
+                    { modal: true, detail: 'Do you want to create a new rule for this cube?' },
+                    'Create Rule'
+                );
+                if (choice === 'Create Rule') {
+                    await vscode.commands.executeCommand('pa-code.createRule', environmentName, instanceName, cubeName);
+                }
+                return;
+            }
             // Only prompt when the file is genuinely different from the server (ignoring
             // line endings / trailing whitespace); a matching file has nothing to protect.
             const serverCanon = ProcessBaseline.canonicalTextHash(content);
@@ -1542,6 +1625,70 @@ export function activate(context: vscode.ExtensionContext) {
             await vscode.window.showTextDocument(doc, { preview: false });
             // Record the rule baseline (local file text equals server content for rules).
             processBaseline.set('rule', instanceName, cubeName, { s: ProcessBaseline.hashText(content), l: ProcessBaseline.hashText(content) });
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Error: ${error.message}`);
+        }
+    });
+
+    // --- COMMAND: CREATE RULE (for a cube that has no rule yet) ---
+    let createRuleCmd = vscode.commands.registerCommand('pa-code.createRule', async (arg1?: any, arg2?: string, arg3?: string) => {
+        try {
+            // Accept either (environmentName, instanceName, cubeName) or a tree item.
+            let environmentName: string | undefined;
+            let instanceName: string | undefined;
+            let cubeName: string | undefined;
+            if (typeof arg1 === 'string') {
+                environmentName = arg1; instanceName = arg2; cubeName = arg3;
+            } else if (arg1) {
+                environmentName = arg1.environmentName;
+                instanceName = arg1.instanceName;
+                cubeName = arg1.cubeName || (arg1.label as string);
+            }
+            if (!environmentName || !instanceName || !cubeName) return;
+
+            const tm1 = TM1Service.getInstance();
+            // If a rule already exists, just open it instead of creating a second one.
+            const existing = await tm1.getRuleContent(instanceName, cubeName);
+            if (existing && existing.trim().length > 0) {
+                await vscode.commands.executeCommand('pa-code.openRule', environmentName, instanceName, cubeName);
+                return;
+            }
+
+            const confirm = await vscode.window.showInformationMessage(
+                `Create a new rule for cube "${cubeName}"?`,
+                { modal: true, detail: 'An editor opens with a starter template. The rule is created on the server when you save.' },
+                'Create Rule'
+            );
+            if (confirm !== 'Create Rule') return;
+
+            const template = `# Rule for ${cubeName}\n# Saving this file creates/updates the rule on the server.\n\n`;
+
+            const config = ConfigManager.getConfig();
+            const envConfig = config.environments.find((e: any) => e.name === environmentName);
+            if (!envConfig) throw new Error(`Configuration for environment ${environmentName} not found.`);
+
+            // Browse-only environments never touch disk — use the in-memory editor.
+            if (envConfig.storeFilesLocally === false) {
+                await openInMemoryEditor(instanceName, 'rule', cubeName, template);
+                return;
+            }
+
+            if (!vscode.workspace.workspaceFolders) return;
+            const rootPath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+            const serverRealName = instanceName.substring(environmentName.length + 1);
+            const targetDir = path.join(rootPath, envConfig.folder, serverRealName, 'Rules');
+            const filePath = path.join(targetDir, `${cubeName}.rux`);
+            if (fs.existsSync(filePath)) {
+                // A local file is already here — just open it rather than overwriting.
+                const d = await vscode.workspace.openTextDocument(filePath);
+                await vscode.window.showTextDocument(d, { preview: false });
+                return;
+            }
+            if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+            fs.writeFileSync(filePath, toLf(template), 'utf8');
+            const doc = await vscode.workspace.openTextDocument(filePath);
+            await vscode.window.showTextDocument(doc, { preview: false });
+            vscode.window.showInformationMessage(`New rule for "${cubeName}" created. Save to push it to the server.`);
         } catch (error: any) {
             vscode.window.showErrorMessage(`Error: ${error.message}`);
         }
@@ -2692,7 +2839,7 @@ export function activate(context: vscode.ExtensionContext) {
     }, 1200000);
 
     // WICHTIG: disconnectCmd zu subscriptions hinzufügen
-    context.subscriptions.push(connectCmd, disconnectCmd, refreshCmd, createProcessCmd, openProcessCmd, deleteProcessCmd, renameProcessCmd, publishChangedFilesCmd, pullAllCmd, saveListener, searchCmd, clearSearchCmd, folderSearchCmd, clearFolderSearchCmd, openRuleCmd, checkRuleSyntaxCmd, executeProcessCmd, executeProcessByLensCmd, settingsCmd, viewLogCmd, showProxyLogCmd, whatsNewCmd, clearOAuthCredentialsCmd, pushToTM1Cmd, codeLensDisposable, tm1LineStatusBar, gotoTM1LineCmd, jumpHighlightDecoration, jumpToLineCmd, formatterDisposable, completionDisposable, functionSnippetDisposable, hoverDisposable, debugFactoryDisposable, debugConfigDisposable, debugProcessByLensCmd, manageConfigCmd, viewThreadsCmd, viewTIConsoleCmd, shortcutTIConsoleCmd, impersonateUserCmd, stopImpersonatingCmd, fileManagerCmd, insertFunctionCmd, searchFunctionsCmd, clearFunctionSearchCmd, deploymentCmd, instanceHubCmd, shortcutSearchCmd, shortcutCreateProcessCmd, shortcutPullAllCmd, shortcutServerLogCmd, shortcutThreadViewerCmd, shortcutDeploymentCmd, securityPanelCmd, addFavoriteCmd, addFavoriteFromEditorCmd, removeFavoriteCmd, clearRecentItemsCmd, executeWithLastParamsCmd, bulkDeleteCmd, mdxWizardCmd, subsetEditorCmd, processLineageCmd, ruleLineageCmd, openCubeViewCmd, openCubeViewerCmd, choreManagerCmd, processPropertiesCmd, tm1DiagnosticCollection, { dispose: () => clearInterval(sessionCheckTimer) });
+    context.subscriptions.push(connectCmd, disconnectCmd, refreshCmd, createProcessCmd, openProcessCmd, deleteProcessCmd, renameProcessCmd, publishChangedFilesCmd, pullAllCmd, saveListener, searchCmd, clearSearchCmd, folderSearchCmd, clearFolderSearchCmd, openRuleCmd, createRuleCmd, checkRuleSyntaxCmd, executeProcessCmd, executeProcessByLensCmd, settingsCmd, viewLogCmd, showProxyLogCmd, whatsNewCmd, clearOAuthCredentialsCmd, pushToTM1Cmd, codeLensDisposable, tm1LineStatusBar, gotoTM1LineCmd, jumpHighlightDecoration, jumpToLineCmd, formatterDisposable, completionDisposable, functionSnippetDisposable, hoverDisposable, debugFactoryDisposable, debugConfigDisposable, debugProcessByLensCmd, manageConfigCmd, viewThreadsCmd, viewTIConsoleCmd, shortcutTIConsoleCmd, impersonateUserCmd, stopImpersonatingCmd, fileManagerCmd, insertFunctionCmd, searchFunctionsCmd, clearFunctionSearchCmd, deploymentCmd, instanceHubCmd, shortcutSearchCmd, shortcutCreateProcessCmd, shortcutPullAllCmd, shortcutServerLogCmd, shortcutThreadViewerCmd, shortcutDeploymentCmd, securityPanelCmd, addFavoriteCmd, addFavoriteFromEditorCmd, removeFavoriteCmd, clearRecentItemsCmd, executeWithLastParamsCmd, bulkDeleteCmd, mdxWizardCmd, subsetEditorCmd, processLineageCmd, ruleLineageCmd, openCubeViewCmd, openCubeViewerCmd, choreManagerCmd, processPropertiesCmd, tm1DiagnosticCollection, tiDeleteWatcher, { dispose: () => clearInterval(sessionCheckTimer) });
 }
 
 export function deactivate() { }

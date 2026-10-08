@@ -4,7 +4,7 @@
   "author": "Tim Geilen",
   "displayName": "pa-code",
   "description": "TM1 Process Editor with Git Integration",
-  "version": "3.8.1",
+  "version": "3.8.2",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -386,6 +386,12 @@
         "icon": "$(type-hierarchy)"
       },
       {
+        "command": "pa-code.createRule",
+        "title": "Create Rule",
+        "category": "PA Code",
+        "icon": "$(add)"
+      },
+      {
         "command": "pa-code.checkRuleSyntax",
         "title": "Check Rule Syntax (no save / no feed)",
         "category": "PA Code",
@@ -624,6 +630,11 @@
           "group": "context@2"
         },
         {
+          "command": "pa-code.createRule",
+          "when": "view == tm1ProcessView && viewItem == tm1cube",
+          "group": "context@3"
+        },
+        {
           "command": "pa-code.removeFavorite",
           "when": "view == tm1Favorites",
           "group": "inline"
@@ -721,42 +732,77 @@
         "command": "pa-code.shortcutTiConsole",
         "key": "ctrl+alt+c",
         "mac": "cmd+alt+c"
+      },
+      {
+        "command": "pa-code.gotoTM1Line",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "editorTextFocus && resourceExtname == .ti"
       }
     ],
     "configurationDefaults": {
       "editor.tokenColorCustomizations": {
         "textMateRules": [
-          {
-            "scope": "comment.line.number-sign.tm1",
-            "settings": {
-              "foreground": "#6A9955"
-            }
-          },
-          {
-            "scope": "entity.name.function.tm1",
-            "settings": {
-              "foreground": "#DCDCAA"
-            }
-          },
-          {
-            "scope": "string.quoted.single.tm1",
-            "settings": {
-              "foreground": "#CE9178"
-            }
-          },
-          {
-            "scope": "keyword.control.tm1",
-            "settings": {
-              "foreground": "#C586C0"
-            }
-          },
-          {
-            "scope": "variable.language.tm1",
-            "settings": {
-              "foreground": "#569CD6"
-            }
-          }
-        ]
+          { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#6A9955" } },
+          { "scope": "entity.name.function.tm1", "settings": { "foreground": "#DCDCAA" } },
+          { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#CE9178" } },
+          { "scope": "keyword.control.tm1", "settings": { "foreground": "#C586C0" } },
+          { "scope": "variable.language.tm1", "settings": { "foreground": "#569CD6" } }
+        ],
+        "[Default Light Modern]": {
+          "textMateRules": [
+            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
+            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
+            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
+            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
+            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
+          ]
+        },
+        "[Default Light+]": {
+          "textMateRules": [
+            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
+            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
+            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
+            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
+            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
+          ]
+        },
+        "[Light+ (default light)]": {
+          "textMateRules": [
+            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
+            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
+            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
+            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
+            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
+          ]
+        },
+        "[Visual Studio Light]": {
+          "textMateRules": [
+            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
+            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
+            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
+            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
+            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
+          ]
+        },
+        "[Quiet Light]": {
+          "textMateRules": [
+            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
+            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
+            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
+            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
+            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
+          ]
+        },
+        "[Solarized Light]": {
+          "textMateRules": [
+            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
+            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
+            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
+            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
+            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
+          ]
+        }
       }
     },
     "mcpServerDefinitionProviders": [

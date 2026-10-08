@@ -1097,6 +1097,53 @@ export class TM1Service {
         }
     }
 
+    /** ID of the caller's own session, used to avoid closing our own connection. */
+    public async getActiveSessionId(instanceName: string): Promise<string | number | undefined> {
+        const cfg = this.getConfig(instanceName);
+        try {
+            const response = await axios.get(`${cfg.url}/api/v1/ActiveSession?$select=ID`, {
+                httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
+            });
+            return response.data?.ID;
+        } catch {
+            return undefined;
+        }
+    }
+
+    /**
+     * Disconnects the user session that owns a given thread (TM1 "disconnect",
+     * i.e. closing the whole session) rather than just cancelling its current
+     * operation ("kill"). Refuses to close the caller's own session.
+     */
+    public async disconnectThreadSession(instanceName: string, threadId: string | number): Promise<{ session: string | number; user?: string }> {
+        const cfg = this.getConfig(instanceName);
+        let sessions: any[];
+        try {
+            const response = await axios.get(
+                `${cfg.url}/api/v1/Sessions?$select=ID&$expand=Threads($select=ID),User($select=Name)`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName) }
+            );
+            sessions = response.data?.value || [];
+        } catch (error: any) {
+            throw new Error(`Failed to look up sessions: ${error.response?.data?.error?.message || error.message}`);
+        }
+        const session = sessions.find(s => (s.Threads || []).some((t: any) => String(t.ID) === String(threadId)));
+        if (!session) throw new Error(`No session found for thread ${threadId} (it may have already finished).`);
+
+        const activeId = await this.getActiveSessionId(instanceName);
+        if (activeId !== undefined && String(activeId) === String(session.ID)) {
+            throw new Error('This thread belongs to your own PA Code session — disconnecting it would drop your connection.');
+        }
+        try {
+            await axios.post(`${cfg.url}/api/v1/Sessions('${session.ID}')/tm1.Close`, {}, {
+                httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
+            });
+        } catch (error: any) {
+            throw new Error(`Failed to disconnect session ${session.ID}: ${error.response?.data?.error?.message || error.message}`);
+        }
+        return { session: session.ID, user: session.User?.Name };
+    }
+
     public async getErrorLog(instanceName: string, logFileName: string): Promise<string> {
         const cfg = this.getConfig(instanceName);
         const encodedName = encodeURIComponent(logFileName).replace(/'/g, "''");

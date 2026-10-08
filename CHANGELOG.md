@@ -4,6 +4,18 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.2] - 2026-10-08
+
+### Added
+- **Shortcut for "Go to TM1 Line"** — jump to a TM1 section/line with **Ctrl+Alt+G** (Cmd+Alt+G on macOS) while a `.ti` file is focused, the same action as the status-bar item.
+- **Thread Viewer: Disconnect** — each thread row now has a **Disconnect** button next to **Kill**. *Kill* cancels only the running operation; *Disconnect* closes the user's entire TM1 session. Includes a confirmation dialog and a safeguard that prevents disconnecting your own PA Code session.
+- **Create Rule** — right-click a cube → **Create Rule** to add a rule when none exists yet. Opens a starter template; the rule is created on the server on save (no empty file is left behind).
+
+### Fixes
+- **Light theme readability** — TI and rule syntax now gets its own readable color set in the built-in light themes (Light Modern, Light+, Visual Studio Light, Quiet Light, Solarized Light). Dark themes keep the exact same colors as before (e.g. green comments).
+- **Rules only shown when they exist** — a cube's Rule node now appears only if the cube actually has a rule. Opening a cube without a rule no longer writes an empty `.rux` file that ends up in Git.
+- **Delete-on-server when a local file is removed** — deleting a process's `.ti` file locally now offers to delete the process on the server too (with confirmation). Bulk deletes (e.g. a Git branch switch) are batched into a single prompt and default to keeping the server objects.
+
 ## [3.8.1] - 2026-09-24
 
 ### Fixes
