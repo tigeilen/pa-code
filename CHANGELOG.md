@@ -4,6 +4,15 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.4] - 2026-10-09
+
+### Added
+- **Guided environment setup wizard** — creating a connection (**+ Add Environment**) now walks you step by step: pick a connection type from plain-language cards, and the wizard only asks for what that type needs. The local folder is prefilled from the name, authentication methods are filtered to the connection type, each option is explained inline, the step chips are clickable, connection examples are shown, and you can Test Connection before creating.
+- **What's New** — a refreshed page summarising everything from 3.8.2 → 3.8.4.
+
+### Changed
+- **Cleaner Edit Environment window** — the local folder and "pull on connect" fields are now hidden entirely for browse-only connections (not just greyed out), and the authentication methods shown match the selected connection type.
+
 ## [3.8.3] - 2026-10-09
 
 ### Added

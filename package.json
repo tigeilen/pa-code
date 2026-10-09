@@ -4,7 +4,7 @@
   "author": "Tim Geilen",
   "displayName": "pa-code",
   "description": "TM1 Process Editor with Git Integration",
-  "version": "3.8.3",
+  "version": "3.8.4",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

@@ -436,6 +436,53 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
             </div>
         </section>
 
+        <!-- SLIDE 8 (headline: 3.8.4) -->
+        <section class="slide">
+            <div class="wrap">
+                <div class="hero">
+                    <span class="pill">VERSION 3.8.4 · HEADLINE</span>
+                    <h1>🧭 Easier setup, a richer Subset Editor & community fixes</h1>
+                    <p>A guided wizard for creating connections, a much more capable Subset Editor, handy workflow shortcuts, and the first batch of GitHub community fixes — rolled up from 3.8.2 → 3.8.4.</p>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">🧭</span> Guided environment setup <span class="emoji">✨</span></h2>
+                    <p class="sub">New in 3.8.4 — create a connection step by step, without the guesswork</p>
+                    <ul>
+                        <li><strong>Step-by-step wizard</strong> on <em>+ Add Environment</em>: pick a connection type (on-prem / single / cloud / v12) from plain-language cards, and we only ask for what that type needs.</li>
+                        <li><strong>Smart defaults &amp; help</strong>: the local folder is prefilled from the name, authentication methods are filtered to the connection type, and each option is explained inline. Clickable steps + a Test Connection button before you create.</li>
+                        <li><strong>Cleaner Edit window</strong>: folder &amp; pull-on-connect are hidden for browse-only connections, and auth methods match the connection type.</li>
+                    </ul>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">🧩</span> Subset Editor, leveled up</h2>
+                    <p class="sub">3.8.3</p>
+                    <ul>
+                        <li><strong>Precise transfers</strong>: insert a member only, <strong>member + direct children (1 level)</strong>, or <strong>member + all descendants</strong>, plus a PAW-style <strong>Replace set</strong> button.</li>
+                        <li><strong>Dynamic MDX</strong>: a <em>Dynamic</em> toggle writes live expressions (<code>…Children</code> / <code>Descendants(…)</code>) instead of a static list.</li>
+                        <li><strong>Format</strong> now lays out <code>{ … }</code> member lists one per line, <strong>Sort</strong> cycles ascending → descending → hierarchical, and the MDX editor stays in sync as you edit the set.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2><span class="emoji">🧰</span> Workflow &amp; editor niceties</h2>
+                    <ul>
+                        <li><strong>Copy Process</strong> — right-click a process to duplicate it under a new name (3.8.3).</li>
+                        <li><strong>Click to connect</strong> — clicking a disconnected instance connects it directly (3.8.3).</li>
+                        <li><strong>Go to TM1 Line</strong> shortcut <code>Ctrl+Alt+G</code>, <strong>Thread Viewer: Disconnect</strong> a session (not just kill), and <strong>Create Rule</strong> on a cube that has none (3.8.2).</li>
+                        <li><strong>Readable light themes</strong> and a <strong>delete-on-server prompt</strong> when you remove a local <code>.ti</code> file (3.8.2).</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2><span class="emoji">🐞</span> Community fixes (GitHub issues)</h2>
+                    <ul>
+                        <li><strong>Lineage shows all call levels</strong> — deeply nested sub-process calls are no longer missing (#2).</li>
+                        <li><strong>CAM/SSO to databases on another host</strong> — PA Code connects to the host each database registered with, with clearer network-vs-auth errors and a connection log (#6).</li>
+                        <li><strong>“Generated Statements” protection</strong> — saving warns (but never blocks copy&amp;paste) when the GUI-managed block was removed (#1).</li>
+                        <li><strong>Browse-only mode</strong> — running processes, favorites, properties and full IntelliSense now work without local files.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
     </div>
 </div>
 <div class="hint">Use ‹ / › or your arrow keys to browse between versions · Reopen anytime via <code>PA Code: What's New</code></div>

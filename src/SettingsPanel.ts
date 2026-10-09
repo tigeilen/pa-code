@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ConfigManager, TM1ProjectConfig, TM1EnvironmentConfig } from './ConfigManager';
 import { TM1Service } from './TM1Service';
+import { EnvironmentWizardPanel } from './EnvironmentWizardPanel';
 
 export class SettingsPanel {
     public static currentPanel: SettingsPanel | undefined;
@@ -41,6 +42,12 @@ export class SettingsPanel {
                         return;
                     case 'refreshConfig':
                         this._sendConfigToWebview();
+                        return;
+                    case 'openAddWizard':
+                        EnvironmentWizardPanel.render(this._extensionUri, this._context, () => {
+                            this._sendConfigToWebview();
+                            if (this.onConfigChanged) this.onConfigChanged();
+                        });
                         return;
                     case 'showError':
                         vscode.window.showErrorMessage(message.message);
@@ -487,16 +494,17 @@ export class SettingsPanel {
             </div>
 
             <div class="form-group">
-                <label id="lblFolder">Local Workspace Folder</label>
-                <input type="text" id="inpFolder" placeholder="e.g. PROD">
-            </div>
-            <div class="form-group">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:normal;">
                     <input type="checkbox" id="inpStoreLocally" checked style="width:auto;"> Store process/rule files locally on "Pull All"
                 </label>
                 <div class="hint" style="font-size:11px; opacity:0.7; margin-top:4px;">On (default): Pull writes files to the workspace folder. Off: stay connected for browsing/analysis (Cube Viewer, rules, processes) without writing files — e.g. keep a repo Dev-only while Test/Prod stay connected.</div>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="folderGroup">
+                <label id="lblFolder">Local Workspace Folder</label>
+                <input type="text" id="inpFolder" placeholder="e.g. PROD">
+                <div class="hint" style="font-size:11px; opacity:0.7; margin-top:4px;">Subfolder in your workspace for this environment's files — usually the same as the name.</div>
+            </div>
+            <div class="form-group" id="pullGroup">
                 <label>Pull from Server on connect</label>
                 <select id="inpPullOnConnect" style="width: 100%; padding: 8px;">
                     <option value="ask">Ask each time (default)</option>
@@ -616,12 +624,15 @@ export class SettingsPanel {
         const inpFolder = document.getElementById('inpFolder');
         const inpTimeout = document.getElementById('inpTimeout');
         const inpStoreLocally = document.getElementById('inpStoreLocally');
-        // "Local Workspace Folder" is only meaningful when files are stored locally.
+        // Local folder + pull-on-connect only matter when files are stored locally,
+        // so hide them entirely (not just disable) for browse-only connections.
         function syncFolderState() {
             const on = inpStoreLocally.checked;
-            inpFolder.disabled = !on;
-            inpFolder.style.opacity = on ? '1' : '0.5';
-            inpFolder.placeholder = on ? 'e.g. PROD' : 'Not used (browse-only)';
+            const fg = document.getElementById('folderGroup');
+            const pg = document.getElementById('pullGroup');
+            if (fg) fg.style.display = on ? 'block' : 'none';
+            if (pg) pg.style.display = on ? 'block' : 'none';
+            inpFolder.placeholder = 'e.g. PROD';
             markRequiredLabels();
         }
         inpStoreLocally.addEventListener('change', syncFolderState);
@@ -678,7 +689,27 @@ export class SettingsPanel {
         }
         inpOAuthRedirectPort.addEventListener('input', updateCallbackUrl);
 
+        // Show only the authentication methods that make sense for the chosen
+        // connection type, and switch away from one that no longer fits.
+        function syncAuthOptions() {
+            const type = inpConnectionType.value;
+            const valid = ({
+                onPremise: ['Prompt','Basic','CAM Browser SSO','Integrated Login'],
+                singleInstance: ['Prompt','Basic','CAM Browser SSO','Integrated Login'],
+                customUrl: ['Basic','API Key','IBM Cloud','OAuth','CAM Browser SSO'],
+                v12Tenant: ['OAuth','API Key']
+            })[type] || ['Prompt','Basic','CAM Browser SSO','Integrated Login'];
+            let firstValid = null;
+            Array.from(inpAuthMethod.options).forEach(function(o){
+                const ok = valid.indexOf(o.value) >= 0;
+                o.hidden = !ok; o.disabled = !ok;
+                if (ok && firstValid === null) firstValid = o.value;
+            });
+            if (valid.indexOf(inpAuthMethod.value) < 0 && firstValid) inpAuthMethod.value = firstValid;
+        }
+
         function updateAuthHint() {
+            syncAuthOptions();
             const val = inpAuthMethod.value;
             camSettings.style.display = (val === 'CAM Browser SSO' || val === 'Prompt') ? 'block' : 'none';
             oauthSettings.style.display = (val === 'OAuth') ? 'block' : 'none';
@@ -744,37 +775,9 @@ export class SettingsPanel {
         inpAuthMethod.addEventListener('change', updateAuthHint);
 
         document.getElementById('addBtn').addEventListener('click', () => {
-            modalTitle.textContent = "Add Environment";
-            editIndex.value = -1;
-            inpName.value = "";
-            inpDesc.value = "";
-            inpConnectionType.value = "onPremise";
-            onPremiseFields.style.display = 'block';
-            cloudFields.style.display = 'none';
-            lblHost.textContent = "Admin Host";
-            lblPort.textContent = "Port";
-            inpHost.value = "";
-            inpPort.value = "5898";
-            inpSsl.checked = true;
-            inpRestUrl.value = "";
-            inpAuthMethod.value = "Prompt";
-            inpCamUrl.value = "";
-            inpNamespace.value = "";
-            inpOAuthPawUrl.value = "";
-            inpOAuthClientId.value = "";
-            inpOAuthClientSecret.value = "";
-            inpOAuthRedirectPort.value = "53173";
-            inpOAuthDatabase.value = "";
-            oauthSecretHint.innerText = "";
-            updateAuthHint();
-            inpFolder.value = "";
-            inpTimeout.value = "15000";
-            document.getElementById('inpStoreLocally').checked = true;
-            document.getElementById('inpPullOnConnect').value = 'ask';
-            syncFolderState();
-            document.getElementById('inpScope').value = defaultScope;
-            clearInvalid();
-            modal.style.display = 'block';
+            // Creation now uses the guided step-by-step wizard; the modal below is
+            // kept for quick edits of an existing environment.
+            vscode.postMessage({ command: 'openAddWizard' });
         });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
