@@ -4,7 +4,7 @@
   "author": "Tim Geilen",
   "displayName": "pa-code",
   "description": "TM1 Process Editor with Git Integration",
-  "version": "3.8.2",
+  "version": "3.8.3",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -186,6 +186,11 @@
         "command": "pa-code.renameProcess",
         "title": "Rename Process",
         "icon": "$(edit)"
+      },
+      {
+        "command": "pa-code.copyProcess",
+        "title": "Copy Process",
+        "icon": "$(copy)"
       },
       {
         "command": "pa-code.publishChangedFiles",
@@ -543,6 +548,11 @@
           "command": "pa-code.renameProcess",
           "when": "view == tm1ProcessView && viewItem == tm1process",
           "group": "7_modification@2"
+        },
+        {
+          "command": "pa-code.copyProcess",
+          "when": "view == tm1ProcessView && viewItem == tm1process",
+          "group": "7_modification@3"
         },
         {
           "command": "pa-code.syncFromTM1",

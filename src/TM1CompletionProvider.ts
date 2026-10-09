@@ -182,7 +182,7 @@ export class TM1CompletionProvider implements vscode.CompletionItemProvider {
         if (!inString) return;
 
         // Resolve which TM1 instance this file belongs to
-        const instanceId = this.resolveInstance(document.fileName);
+        const instanceId = this.resolveInstanceFromDoc(document);
         if (!instanceId || !TM1Service.getInstance().isConnected(instanceId)) return;
 
         // Determine completion type from function context
@@ -406,6 +406,17 @@ export class TM1CompletionProvider implements vscode.CompletionItemProvider {
                 item.insertText = n;
                 return item;
             });
+    }
+
+    // Resolve the instance for both on-disk files and browse-only in-memory docs
+    // (tm1mem:/<instanceId>/<folder>/<name>.<ext>), which have no folder layout.
+    private resolveInstanceFromDoc(document: vscode.TextDocument): string | null {
+        if (document.uri.scheme === 'tm1mem') {
+            const instanceId = document.uri.path.split('/').filter(Boolean)[0];
+            if (instanceId && TM1Service.getInstance().isConnected(instanceId)) return instanceId;
+            return null;
+        }
+        return this.resolveInstance(document.fileName);
     }
 
     private resolveInstance(filePath: string): string | null {

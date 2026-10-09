@@ -22,6 +22,8 @@ export class TM1TreeItem extends vscode.TreeItem {
     ) {
         super(label, collapsibleState);
     }
+    /** Registered database host from Admin Server discovery (Issue #6). */
+    public serverHost?: string;
 }
 
 export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
@@ -73,7 +75,16 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
     // dim+hier) so each folder searches independently. Used by the search commands.
     static viewsFilterKey(cube: string): string { return `cube_views\u0000${cube}`; }
     static subsetsFilterKey(dim: string, hier: string): string { return `hierarchy_subsets\u0000${dim}\u0000${hier}`; }
-    getTreeItem(element: TM1TreeItem): vscode.TreeItem { return element; }
+    getTreeItem(element: TM1TreeItem): vscode.TreeItem {
+        // A disconnected instance has nothing to expand. Make a left-click connect
+        // it (same as the plug icon) and drop the misleading expand arrow, instead
+        // of opening an empty node.
+        if (element.type === 'instance' && element.contextValue === 'tm1instance_disconnected' && element.instanceName) {
+            element.command = { command: 'pa-code.connectTM1', title: 'Connect', arguments: [element] };
+            (element as vscode.TreeItem).collapsibleState = vscode.TreeItemCollapsibleState.None;
+        }
+        return element;
+    }
 
     private makeDimensionItem(environmentName: string, instanceName: string, dimName: string): TM1TreeItem {
         const item = new TM1TreeItem(dimName, vscode.TreeItemCollapsibleState.Collapsed, 'dimension', environmentName, instanceName, 'tm1dimension', undefined, undefined, undefined, dimName);
@@ -199,7 +210,7 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
                     item.iconPath = this.getInstanceIcon(instanceId);
                     return [item];
                 } else {
-                    let servers: { Name: string, Port: number, SSL: boolean }[] = [];
+                    let servers: { Name: string, Port: number, SSL: boolean, Host?: string }[] = [];
                     try {
                         servers = await tm1.getServersFromAdminHost(env.adminHost || '', env.port || 5898, env.ssl !== false);
                     } catch {
@@ -228,6 +239,7 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
                             s.Port,
                             s.SSL
                         );
+                        item.serverHost = s.Host;
 
                         const activeFilter = this.filters.get(instanceId);
                         const badge = this.getAdminBadge(instanceId, env.connectionType);

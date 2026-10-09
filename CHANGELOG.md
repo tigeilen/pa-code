@@ -4,6 +4,23 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.3] - 2026-10-09
+
+### Added
+- **Copy Process** — right-click a process → **Copy Process** to make a 1:1 duplicate under a new name (with a name prompt, like Rename).
+- **Subset Editor transfer options** — separate buttons for **member only**, **member + direct children (1 level)** and **member + all descendants**, plus a **Replace set with new insertion** button (PAW-style).
+- **Subset Editor dynamic MDX** — a **Dynamic** toggle makes the children/descendants buttons write a live expression (`…​.Children` / `Descendants(…)`) instead of a static member list.
+- **Connect on click** — clicking a disconnected instance in the tree now connects it directly (same as the plug icon) instead of opening an empty node.
+
+### Fixes
+- **Lineage shows all call levels** (#2) — the process call-tree now detects `ExecuteProcess`/`RunProcess` across the whole code, handles TM1's doubled-quote escapes, resolves variable-named calls and ignores commented-out calls, so deeply nested sub-processes are no longer missing.
+- **CAM/SSO connect to databases on another host** (#6) — PA Code now connects to the host each database **registered with** (falling back to the Admin Server host), so databases that live on a different machine than the Admin Server no longer time out. Connection errors now separate network problems (timeout/refused/DNS) from authentication, and a new **"PA Code (Connection)"** output channel logs the chosen endpoint.
+- **"Generated Statements" block protection** (#1) — saving a process warns before pushing when its GUI-managed *Generated Statements* block was removed or left with unbalanced Begin/End markers. It's a confirmation, not a lock, so copy&paste of a whole process still works.
+- **Subset Editor Format** now also breaks `{ … }` member lists onto one member per line (previously only parentheses were formatted); **Minify** reverses it exactly.
+- **Subset Editor sort** cycles ascending → descending → hierarchical (was ascending-only).
+- **Subset Editor live sync** — editing the member tree now updates the MDX editor (unless you hand-edited the MDX).
+- **Browse-only environments** — running a process, adding favorites, editing process properties and full IntelliSense now work for in-memory (no-local-files) documents; debugging shows a clear "requires local files" message instead of a cryptic error.
+
 ## [3.8.2] - 2026-10-08
 
 ### Added

@@ -431,7 +431,9 @@ ${mdxBuilderStyles()}
         <!-- TRANSFER -->
         <div class="transfer">
             <button id="addBtn" title="Insert member only">▶</button>
-            <button id="addChildrenBtn" title="Insert with children">⏵⏵</button>
+            <button id="addChildrenBtn" title="Insert member + its direct children (1 level)">⏵⏵</button>
+            <button id="addDescBtn" title="Insert member + all descendants (whole subtree)">⏵⏵⏵</button>
+            <button id="replaceBtn" title="Replace set with new insertion (selected, or all visible)">↱</button>
             <button id="addVisibleBtn" title="Add all currently displayed members">⇉</button>
             <button id="addAllBtn" title="Add all available members">⏭</button>
             <button id="removeBtn" title="Remove">◀</button>
@@ -472,6 +474,7 @@ ${mdxBuilderStyles()}
         <button class="secondary" id="mdxMinifyBtn" title="Collapse the MDX back onto a single line">Minify</button>
         <button class="secondary" id="mdxCopyBtn" title="Copy MDX to clipboard">Copy</button>
         <button class="secondary" id="mdxBuildToggle" title="Show the visual Subset Builder — it writes into this editor">🔧 Wizard</button>
+        <label class="mdx-auto" title="Children / Descendants buttons write a dynamic MDX expression (e.g. Descendants(...)) instead of a static member list"><input type="checkbox" id="dynMode"> Dynamic</label>
         <label class="mdx-auto" title="Apply automatically as you type"><input type="checkbox" id="mdxAuto"> Live</label>
     </div>
     <textarea id="mdxText" spellcheck="false"></textarea>
@@ -801,7 +804,7 @@ function rebuildSetFlat() {
                 flat.push({ name: n, depth: 0, hasChildren: false, expanded: false });
             }
         }
-        state.setFlat = flat; renderSet(); return;
+        state.setFlat = flat; renderSet(); if (typeof syncMdxFromSet === 'function') syncMdxFromSet(); return;
     }
     for (const n of state.setMembers) {
         const kids = state.childrenMap.get(n);
@@ -813,7 +816,7 @@ function rebuildSetFlat() {
             expanded: hasInSetChildren(n, setSet)
         });
     }
-    state.setFlat = flat; renderSet();
+    state.setFlat = flat; renderSet(); if (typeof syncMdxFromSet === 'function') syncMdxFromSet();
 }
 // Twisty click on a set consolidation: expand pulls its direct children into the
 // set (nesting them); collapse removes its in-set descendants again.
@@ -910,10 +913,41 @@ function collectDescendants(name, acc) {
     const kids = state.childrenMap.get(name);
     if (kids) for (const k of kids) collectDescendants(k, acc);
 }
-function addMembers(withChildren) {
+// Member + its DIRECT children only (one level), matching PAW's "children".
+function collectChildren(name, acc) {
+    acc.push(name);
+    const kids = state.childrenMap.get(name);
+    if (kids) for (const k of kids) acc.push(k);
+}
+// Order index reflecting the hierarchy (depth-first over roots), used for the
+// "hierarchical" sort of the current set.
+function hierOrderMap() {
+    const order = new Map();
+    let i = 0;
+    const seen = new Set();
+    const walk = (n) => {
+        if (seen.has(n)) return;
+        seen.add(n); order.set(n, i++);
+        const kids = state.childrenMap.get(n);
+        if (kids) for (const k of kids) walk(k);
+    };
+    for (const r of (state.roots || [])) walk(r);
+    return order;
+}
+function addMembers(mode) {
+    // mode: 'self' = member only · 'children' = member + direct children (1 level)
+    //       · 'descendants' = member + the whole subtree (all levels).
+    // When "Dynamic" is on, children/descendants write a live MDX expression
+    // (…​.Children / Descendants(…)) instead of expanding to a static list.
+    if (mode !== 'self' && dynamicActive() && state.availSelected.size) {
+        const frags = [...state.availSelected].map(n => dynFragment(n, mode));
+        insertDynamic(frags);
+        return;
+    }
     const toAdd = [];
     for (const name of state.availSelected) {
-        if (withChildren) { const acc = []; collectDescendants(name, acc); toAdd.push(...acc); }
+        if (mode === 'descendants') { const acc = []; collectDescendants(name, acc); toAdd.push(...acc); }
+        else if (mode === 'children') { const acc = []; collectChildren(name, acc); toAdd.push(...acc); }
         else toAdd.push(name);
     }
     const existing = new Set(state.setMembers);
@@ -922,11 +956,54 @@ function addMembers(withChildren) {
     renderAvail(); rebuildSetFlat();
     setStatus(state.setMembers.length + ' members in set.');
 }
+// ---- Dynamic MDX helpers ----
+function qref(name) { return '[' + state.dimension + '].[' + state.hierarchy + '].[' + name + ']'; }
+function dynFragment(name, mode) {
+    if (mode === 'children') return qref(name) + '.Children';
+    if (mode === 'descendants') return 'Descendants(' + qref(name) + ')';
+    return qref(name);
+}
+function dynamicActive() {
+    const c = document.getElementById('dynMode');
+    const split = document.getElementById('split');
+    return !!(c && c.checked && split && split.classList.contains('mdx-open'));
+}
+// Append dynamic set fragments to the MDX editor (unioned into the current set
+// literal) and resolve them into the live preview. The editor keeps the dynamic
+// expression; the set panel shows the members it currently resolves to.
+function insertDynamic(frags) {
+    const ta = document.getElementById('mdxText');
+    const cur = minifyMDX(ta.value || '');
+    const m = cur.match(/^\\{([\\s\\S]*)\\}$/);
+    const combined = (m && m[1].trim())
+        ? '{' + m[1].trim() + ', ' + frags.join(', ') + '}'
+        : '{' + frags.join(', ') + '}';
+    ta.value = formatMDX(combined);
+    // Mark as a user/dynamic expression so the tree→MDX sync never rewrites it
+    // back into a static list.
+    state._lastAutoMDX = '\\u0001';
+    histRecord();
+    state.availSelected.clear();
+    renderAvail();
+    applyMdxNow();
+}
 function removeMembers() {
     if (state.setSelected.size === 0) return;
     state.setMembers = state.setMembers.filter(n => !state.setSelected.has(n));
     state.setSelected.clear();
     rebuildSetFlat();
+}
+// PAW's "Replace set with new insertion": discard the current set and insert the
+// selected available members (or, if none are selected, all currently visible).
+function replaceMembers() {
+    const names = state.availSelected.size ? [...state.availSelected] : state.availFlat.map(n => n.name);
+    state.setMembers = [];
+    state.setSelected.clear(); state.setExpanded.clear(); state.setDepthMap.clear();
+    const existing = new Set();
+    for (const n of names) if (!existing.has(n)) { state.setMembers.push(n); existing.add(n); state.setDepthMap.set(n, 0); }
+    state.availSelected.clear();
+    renderAvail(); rebuildSetFlat();
+    setStatus(state.setMembers.length + ' members in set (replaced).');
 }
 function keepSelectedInSet() {
     if (state.setSelected.size === 0) return;
@@ -1014,11 +1091,14 @@ function minifyMDX(mdx){
         .replace(/\\s+/g,' ')
         .replace(/\\s*\\(\\s*/g,'(')
         .replace(/\\s*\\)/g,')')
+        .replace(/\\s*\\{\\s*/g,'{')
+        .replace(/\\s*\\}/g,'}')
         .replace(/\\s*,\\s*/g,', ')
         .trim();
 }
 // Pretty-print MDX: top-level clauses on their own lines and nested function
-// parentheses indented by depth. Purely cosmetic; Minify reverses it exactly.
+// parentheses / set braces indented by depth. A plain set literal like
+// {[d].[h].[a], [d].[h].[b]} becomes one member per line. Minify reverses it.
 function formatMDX(mdx){
     let s=minifyMDX(mdx);
     if(!s) return s;
@@ -1034,8 +1114,8 @@ function formatMDX(mdx){
             i+=clause[1].length-1;
             continue;
         }
-        if(ch==='('){ depth++; out+='(\\n'+pad(); }
-        else if(ch===')'){ out=out.replace(/\\s+$/,''); depth=Math.max(0,depth-1); out+='\\n'+indent.repeat(depth+1)+')'; }
+        if(ch==='(' || ch==='{'){ depth++; out+=ch+'\\n'+pad(); }
+        else if(ch===')' || ch==='}'){ out=out.replace(/\\s+$/,''); depth=Math.max(0,depth-1); out+='\\n'+indent.repeat(depth+1)+ch; }
         else if(ch===',' && depth>0){ out+=',\\n'+pad(); }
         else if(ch===' ' && /\\s$/.test(out)){ /* squeeze */ }
         else out+=ch;
@@ -1079,10 +1159,27 @@ function buildMDX() {
 function toggleMdxDock(){
     const split=document.getElementById('split');
     if(split.classList.contains('mdx-open')){ closeMdxDock(); return; }
-    document.getElementById('mdxText').value=formatMDX(buildMDX());
+    const gen=formatMDX(buildMDX());
+    document.getElementById('mdxText').value=gen;
+    state._lastAutoMDX=minifyMDX(gen);
     histReset(document.getElementById('mdxText').value);
     split.classList.add('mdx-open');
     renderFnList(); renderSnList();
+}
+// Keep the MDX editor in sync with changes made in the member tree (transfer /
+// remove / sort / move). Only overwrites an *auto-generated* expression — if the
+// user hand-edited the MDX (e.g. wrote Descendants(...)), it is left untouched.
+function syncMdxFromSet(){
+    const split=document.getElementById('split');
+    if(!split || !split.classList.contains('mdx-open')) return;
+    const ta=document.getElementById('mdxText');
+    if(!ta) return;
+    if(state._lastAutoMDX!=null && minifyMDX(ta.value)!==state._lastAutoMDX) return; // user edited — don't clobber
+    const gen=formatMDX(buildMDX());
+    if(ta.value===gen) return;
+    ta.value=gen;
+    state._lastAutoMDX=minifyMDX(gen);
+    histRecord();
 }
 function closeMdxDock(){ document.getElementById('split').classList.remove('mdx-open'); }
 function applyMdxNow(){
@@ -1406,8 +1503,10 @@ function init() {
     document.getElementById('availSearch').addEventListener('input', e => { state.availSearch = e.target.value; rebuildAvailFlat(); });
     document.getElementById('setSearch').addEventListener('input', e => { state.setSearch = e.target.value; rebuildSetFlat(); });
 
-    document.getElementById('addBtn').addEventListener('click', () => addMembers(false));
-    document.getElementById('addChildrenBtn').addEventListener('click', () => addMembers(true));
+    document.getElementById('addBtn').addEventListener('click', () => addMembers('self'));
+    document.getElementById('addChildrenBtn').addEventListener('click', () => addMembers('children'));
+    document.getElementById('addDescBtn').addEventListener('click', () => addMembers('descendants'));
+    document.getElementById('replaceBtn').addEventListener('click', replaceMembers);
     document.getElementById('addVisibleBtn').addEventListener('click', addVisible);
     document.getElementById('addAllBtn').addEventListener('click', addAll);
     document.getElementById('removeBtn').addEventListener('click', removeMembers);
@@ -1425,7 +1524,22 @@ function init() {
     document.getElementById('setUpBtn').addEventListener('click', () => moveSet(-1));
     document.getElementById('setDownBtn').addEventListener('click', () => moveSet(1));
     document.getElementById('setSortBtn').addEventListener('click', () => {
-        state.setMembers.sort((a, b) => display(a).localeCompare(display(b))); rebuildSetFlat();
+        // Cycle: ascending → descending → hierarchical (original tree order).
+        const cur = state.setSortMode;
+        state.setSortMode = cur === 'asc' ? 'desc' : cur === 'desc' ? 'hier' : 'asc';
+        const btn = document.getElementById('setSortBtn');
+        if (state.setSortMode === 'asc') {
+            state.setMembers.sort((a, b) => display(a).localeCompare(display(b)));
+            btn.textContent = '↑'; btn.title = 'Sort: ascending (click for descending)';
+        } else if (state.setSortMode === 'desc') {
+            state.setMembers.sort((a, b) => display(b).localeCompare(display(a)));
+            btn.textContent = '↓'; btn.title = 'Sort: descending (click for hierarchical)';
+        } else {
+            const om = hierOrderMap();
+            state.setMembers.sort((a, b) => (om.has(a) ? om.get(a) : 1e9) - (om.has(b) ? om.get(b) : 1e9));
+            btn.textContent = '≣'; btn.title = 'Sort: hierarchical (click for ascending)';
+        }
+        rebuildSetFlat();
     });
 
     // Filter flyout

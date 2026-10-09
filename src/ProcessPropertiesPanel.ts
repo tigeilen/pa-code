@@ -48,6 +48,13 @@ export class ProcessPropertiesPanel {
     }
 
     private _resolveInstance(): string | undefined {
+        // Browse-only in-memory docs carry the instance in their URI path
+        // (tm1mem:/<instanceId>/Processes/<name>.ti), not in a folder layout.
+        const uri = this._document.uri;
+        if (uri.scheme === 'tm1mem') {
+            const seg = uri.path.split('/').filter(Boolean);
+            return seg[0] || undefined;
+        }
         const filePath = this._document.fileName;
         const parentDir = path.dirname(filePath);
         const serverFolder = path.dirname(parentDir);

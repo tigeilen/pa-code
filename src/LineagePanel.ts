@@ -355,29 +355,46 @@ export class LineagePanel {
     // ExecuteProcess/RunProcess targets; resolves literal names and simple
     // variables assigned earlier in the code (var = 'Name';).
     private static _findExecutedProcesses(code: string): string[] {
-        const lines = code.split('\n');
-        const rx = /\b(?:ExecuteProcess|RunProcess)\s*\(\s*([^,)]+?)\s*[,)]/gi;
         const out: string[] = [];
-        for (let i = 0; i < lines.length; i++) {
-            let m;
-            rx.lastIndex = 0;
-            while ((m = rx.exec(lines[i]))) {
-                const resolved = LineagePanel._resolveArg(m[1].trim(), lines, i);
-                if (resolved) out.push(resolved);
-            }
+        const clean = LineagePanel._stripCodeComments(code);
+        // Scan the WHOLE code (calls may appear in any section and span lines).
+        // Capture the first argument: a single/double-quoted literal (allowing the
+        // doubled-quote escapes TM1 uses) or a plain variable identifier.
+        const rx = /\b(?:ExecuteProcess|RunProcess)\s*\(\s*('(?:[^']|'')*'|"(?:[^"]|"")*"|[A-Za-z_]\w*)/gi;
+        let m;
+        while ((m = rx.exec(clean))) {
+            const resolved = LineagePanel._resolveArg(m[1].trim(), clean);
+            if (resolved) out.push(resolved);
         }
         return out;
     }
-    private static _resolveArg(arg: string, lines: string[], idx: number): string | null {
-        const q = arg.match(/^['"](.+?)['"]$/);
-        if (q) return q[1];
+    // Remove TI comments (# to end of line, when not inside a single-quoted string)
+    // so commented-out ExecuteProcess calls aren't counted as real dependencies.
+    private static _stripCodeComments(code: string): string {
+        return code.split('\n').map(line => {
+            let inS = false;
+            for (let i = 0; i < line.length; i++) {
+                const c = line[i];
+                if (c === "'") inS = !inS;
+                else if (c === '#' && !inS) return line.slice(0, i);
+            }
+            return line;
+        }).join('\n');
+    }
+    private static _resolveArg(arg: string, code: string): string | null {
+        const q = arg.match(/^'((?:[^']|'')*)'$/) || arg.match(/^"((?:[^"]|"")*)"$/);
+        if (q) return q[1].replace(/''/g, "'").replace(/""/g, '"');
         if (!/^[A-Za-z_]\w*$/.test(arg)) return null; // not a plain variable
-        const assign = new RegExp('\\b' + arg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\s*=\\s*(['\"])(.+?)\\1", 'i');
-        for (let i = idx; i >= 0; i--) {
-            const a = assign.exec(lines[i]);
-            if (a) return a[2];
+        // Resolve the variable to the last string literal assigned to it anywhere
+        // in the code (handles names set once near the top and reused below).
+        const esc = arg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const assign = new RegExp('\\b' + esc + "\\s*=\\s*('((?:[^']|'')*)'|\"((?:[^\"]|\"\")*)\")", 'gi');
+        let a: RegExpExecArray | null, last: string | null = null;
+        while ((a = assign.exec(code))) {
+            const lit = a[2] != null ? a[2].replace(/''/g, "'") : (a[3] != null ? a[3].replace(/""/g, '"') : null);
+            if (lit != null) last = lit;
         }
-        return null;
+        return last;
     }
 
     private _html(): string {

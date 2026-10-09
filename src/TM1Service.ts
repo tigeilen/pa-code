@@ -23,7 +23,7 @@ export class TM1Service {
     private static instance: TM1Service;
     private static _proxyInterceptorInstalled = false;
     private connections: Map<string, ConnectionInfo> = new Map();
-    private adminHostCache: Map<string, { servers: { Name: string, Port: number, SSL: boolean }[], timestamp: number }> = new Map();
+    private adminHostCache: Map<string, { servers: { Name: string, Port: number, SSL: boolean, Host?: string }[], timestamp: number }> = new Map();
     private httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
     // IntelliSense caches
@@ -667,7 +667,7 @@ export class TM1Service {
         }
     }
 
-    public async getServersFromAdminHost(host: string, port: number, ssl: boolean): Promise<{ Name: string, Port: number, SSL: boolean }[]> {
+    public async getServersFromAdminHost(host: string, port: number, ssl: boolean): Promise<{ Name: string, Port: number, SSL: boolean, Host?: string }[]> {
         const cacheKey = `${host}:${port}`;
         const cached = this.adminHostCache.get(cacheKey);
         if (cached && (Date.now() - cached.timestamp < 60000)) {
@@ -684,11 +684,24 @@ export class TM1Service {
         const servers = (response.data.value || []).map((s: any) => ({
             Name: s.Name,
             Port: s.HTTPPortNumber,
-            SSL: s.UsingSSL
+            SSL: s.UsingSSL,
+            // Keep the host each database registered with so we can connect to the
+            // database's own machine, not the Admin Server's (they can differ when
+            // several Admin Servers share databases on other hosts). Issue #6.
+            Host: TM1Service._registeredHost(s)
         })).sort((a: any, b: any) => a.Name.localeCompare(b.Name));
 
         this.adminHostCache.set(cacheKey, { servers, timestamp: Date.now() });
         return servers;
+    }
+
+    // Pick a usable registered host from a /api/v1/Servers entry, ignoring
+    // wildcard bind addresses that aren't connectable.
+    private static _registeredHost(s: any): string | undefined {
+        const cand = [s.IPAddress, s.Host, s.IPv6Address].find(
+            (h: any) => typeof h === 'string' && h.trim() && !/^(0\.0\.0\.0|::|::0|0:0:0:0:0:0:0:0)$/.test(h.trim())
+        );
+        return cand ? String(cand).trim() : undefined;
     }
 
     public async getCamInfo(baseUrl: string): Promise<{ isCam: boolean, camUrl?: string }> {
