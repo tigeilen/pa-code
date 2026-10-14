@@ -101,8 +101,50 @@ function countGeneratedBlocks(text: string): { begin: number; end: number } {
     return { begin, end };
 }
 
+// TM1 syntax colors, applied at runtime based on the active theme kind. Theme-
+// scoped token customizations in `configurationDefaults` are not reliably applied
+// by VS Code, so we instead write our tm1-scoped rules into the user's settings
+// and swap them when the theme switches between light and dark.
+const TM1_DARK_RULES = [
+    { scope: 'comment.line.number-sign.tm1', settings: { foreground: '#6A9955' } },
+    { scope: 'entity.name.function.tm1', settings: { foreground: '#DCDCAA' } },
+    { scope: 'string.quoted.single.tm1', settings: { foreground: '#CE9178' } },
+    { scope: 'keyword.control.tm1', settings: { foreground: '#C586C0' } },
+    { scope: 'variable.language.tm1', settings: { foreground: '#569CD6' } }
+];
+const TM1_LIGHT_RULES = [
+    { scope: 'comment.line.number-sign.tm1', settings: { foreground: '#008000' } },
+    { scope: 'entity.name.function.tm1', settings: { foreground: '#795E26' } },
+    { scope: 'string.quoted.single.tm1', settings: { foreground: '#A31515' } },
+    { scope: 'keyword.control.tm1', settings: { foreground: '#AF00DB' } },
+    { scope: 'variable.language.tm1', settings: { foreground: '#0000FF' } }
+];
+
+async function applyTm1ThemeColors(): Promise<void> {
+    if (!vscode.workspace.getConfiguration('pa-code').get<boolean>('syntaxColors.enabled', true)) return;
+    const kind = vscode.window.activeColorTheme.kind;
+    const isLight = kind === vscode.ColorThemeKind.Light || kind === vscode.ColorThemeKind.HighContrastLight;
+    const rules = isLight ? TM1_LIGHT_RULES : TM1_DARK_RULES;
+
+    const cfg = vscode.workspace.getConfiguration();
+    const current: any = cfg.get('editor.tokenColorCustomizations') || {};
+    const existing: any[] = Array.isArray(current.textMateRules) ? current.textMateRules : [];
+    // Keep the user's own rules; replace only the ones we manage (scope ends .tm1).
+    const preserved = existing.filter(r => !(typeof r?.scope === 'string' && r.scope.endsWith('.tm1')));
+    const merged = [...preserved, ...rules];
+    if (JSON.stringify(existing) === JSON.stringify(merged)) return; // nothing to change
+    try {
+        await cfg.update('editor.tokenColorCustomizations', { ...current, textMateRules: merged }, vscode.ConfigurationTarget.Global);
+    } catch { /* settings may be read-only in some environments — ignore */ }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+    // Apply TM1 syntax colors for the current theme, and re-apply when the user
+    // switches between a light and a dark theme.
+    void applyTm1ThemeColors();
+    context.subscriptions.push(vscode.window.onDidChangeActiveColorTheme(() => { void applyTm1ThemeColors(); }));
 
     // Give ConfigManager access to VS Code storage (connections now live there
     // by default; the legacy tm1-project.json is still read if present).

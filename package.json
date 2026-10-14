@@ -4,7 +4,7 @@
   "author": "Tim Geilen",
   "displayName": "pa-code",
   "description": "TM1 Process Editor with Git Integration",
-  "version": "3.8.5",
+  "version": "3.8.6",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -750,26 +750,6 @@
         "when": "editorTextFocus && resourceExtname == .ti"
       }
     ],
-    "configurationDefaults": {
-      "editor.tokenColorCustomizations": {
-        "textMateRules": [
-          { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#6A9955" } },
-          { "scope": "entity.name.function.tm1", "settings": { "foreground": "#DCDCAA" } },
-          { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#CE9178" } },
-          { "scope": "keyword.control.tm1", "settings": { "foreground": "#C586C0" } },
-          { "scope": "variable.language.tm1", "settings": { "foreground": "#569CD6" } }
-        ],
-        "[Light Modern][Default Light Modern][Light+ (default light)][Default Light+][Light (Visual Studio)][Visual Studio Light][Quiet Light][Solarized Light][Default High Contrast Light]": {
-          "textMateRules": [
-            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
-            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
-            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
-            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
-            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
-          ]
-        }
-      }
-    },
     "mcpServerDefinitionProviders": [
       {
         "id": "paCodeTm1Mcp",
@@ -779,6 +759,11 @@
     "configuration": {
       "title": "PA Code",
       "properties": {
+        "pa-code.syntaxColors.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Apply readable TM1 (.ti/.rux) syntax colors that adapt to your light or dark theme. PA Code writes a small set of TM1-scoped rules to 'editor.tokenColorCustomizations' and swaps them when you switch between a light and a dark theme. Turn this off if you prefer to manage TM1 colors yourself."
+        },
         "pa-code.mcpServer.enabled": {
           "type": "boolean",
           "default": true,

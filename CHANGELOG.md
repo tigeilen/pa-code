@@ -4,6 +4,11 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.6] - 2026-10-14
+
+### Fixes
+- **Light theme syntax colors — properly this time.** Theme-scoped token colors contributed via `configurationDefaults` are not reliably applied by VS Code, so light themes still showed the dark palette. PA Code now sets its TM1 (.ti/.rux) syntax colors **at runtime based on your active theme** (light vs dark) and swaps them automatically when you switch themes — so it works with every theme, built-in or custom, by theme *kind* rather than name. You can opt out via **`pa-code.syntaxColors.enabled`**.
+
 ## [3.8.5] - 2026-10-14
 
 ### Fixes
