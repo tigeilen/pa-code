@@ -4,6 +4,11 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.5] - 2026-10-14
+
+### Fixes
+- **Light theme syntax colors now actually apply** — the readable light-theme colors were keyed only by theme id (e.g. `Default Light Modern`), so the built-in **Light Modern** / **Light+** themes (matched by their display name) still showed the dark palette and were hard to read. The light colors now cover every built-in light theme by both name and id. Dark themes are unchanged.
+
 ## [3.8.4] - 2026-10-09
 
 ### Added

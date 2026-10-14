@@ -4,7 +4,7 @@
   "author": "Tim Geilen",
   "displayName": "pa-code",
   "description": "TM1 Process Editor with Git Integration",
-  "version": "3.8.4",
+  "version": "3.8.5",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -759,52 +759,7 @@
           { "scope": "keyword.control.tm1", "settings": { "foreground": "#C586C0" } },
           { "scope": "variable.language.tm1", "settings": { "foreground": "#569CD6" } }
         ],
-        "[Default Light Modern]": {
-          "textMateRules": [
-            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
-            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
-            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
-            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
-            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
-          ]
-        },
-        "[Default Light+]": {
-          "textMateRules": [
-            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
-            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
-            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
-            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
-            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
-          ]
-        },
-        "[Light+ (default light)]": {
-          "textMateRules": [
-            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
-            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
-            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
-            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
-            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
-          ]
-        },
-        "[Visual Studio Light]": {
-          "textMateRules": [
-            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
-            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
-            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
-            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
-            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
-          ]
-        },
-        "[Quiet Light]": {
-          "textMateRules": [
-            { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
-            { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
-            { "scope": "string.quoted.single.tm1", "settings": { "foreground": "#A31515" } },
-            { "scope": "keyword.control.tm1", "settings": { "foreground": "#AF00DB" } },
-            { "scope": "variable.language.tm1", "settings": { "foreground": "#0000FF" } }
-          ]
-        },
-        "[Solarized Light]": {
+        "[Light Modern][Default Light Modern][Light+ (default light)][Default Light+][Light (Visual Studio)][Visual Studio Light][Quiet Light][Solarized Light][Default High Contrast Light]": {
           "textMateRules": [
             { "scope": "comment.line.number-sign.tm1", "settings": { "foreground": "#008000" } },
             { "scope": "entity.name.function.tm1", "settings": { "foreground": "#795E26" } },
