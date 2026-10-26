@@ -37,7 +37,7 @@ export class CelebrationPanel {
         const h = new Date().getHours();
         const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
         const emoji = h < 12 ? '\u2600\uFE0F' : h < 18 ? '\uD83C\uDF24\uFE0F' : '\uD83C\uDF19';
-        vscode.window.showInformationMessage(`${emoji} ${part}! Welcome back to PA Code \u2014 first connect of the day. Happy modeling!`);
+        vscode.window.showInformationMessage(`${emoji} ${part}! Welcome back to PA-Code \u2014 first connect of the day. Happy modeling!`);
     }
 
     // --------------------------------------------------------------- toast styles

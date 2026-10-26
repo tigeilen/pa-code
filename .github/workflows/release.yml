@@ -49,7 +49,13 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: PA Code ${{ github.ref_name }}
+          name: PA-Code ${{ github.ref_name }}
           body_path: release-notes.md
           files: pa-code-${{ steps.version.outputs.version }}.vsix
           fail_on_unmatched_files: true
+
+      - name: Publish to Open VSX
+        if: ${{ secrets.OVSX_TOKEN != '' }}
+        env:
+          OVSX_TOKEN: ${{ secrets.OVSX_TOKEN }}
+        run: npx --yes ovsx publish "pa-code-${{ steps.version.outputs.version }}.vsix" -p "$OVSX_TOKEN"

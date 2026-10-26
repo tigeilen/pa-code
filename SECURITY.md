@@ -2,7 +2,7 @@
 
 This document outlines the security, privacy, and compliance principles of the **PA-Code** extension for Visual Studio Code. We understand that IBM Planning Analytics (TM1) handles highly sensitive corporate data. Therefore, this extension is built with a strict "security by design" approach to meet enterprise compliance standards.
 
-PA Code is **open source** under the **Apache License 2.0** and developed in the open at <https://github.com/tigeilen/pa-code>, so anyone can review the code independently.
+PA-Code is **open source** under the **Apache License 2.0** and developed in the open at <https://github.com/tigeilen/pa-code>, so anyone can review the code independently.
 
 ## 1. Data Privacy & Telemetry (Zero Data Exfiltration)
 **We do not track you, and we do not collect your data.**
@@ -23,7 +23,7 @@ PA Code is **open source** under the **Apache License 2.0** and developed in the
 The extension relies exclusively on the official and documented **IBM Planning Analytics REST API**. It does not use undocumented endpoints or unauthorized methods to interact with the system. Security and access rights are enforced entirely by your TM1 server configuration.
 
 ## 5. Open Source & Code Review
-PA Code is **open source**, developed in the open on GitHub under the **Apache License 2.0**. Corporate Information Security policies often require code reviews for tools connecting to financial systems — with PA Code you can do this yourself, no NDA required.
+PA-Code is **open source**, developed in the open on GitHub under the **Apache License 2.0**. Corporate Information Security policies often require code reviews for tools connecting to financial systems — with PA-Code you can do this yourself, no NDA required.
 * **Full source available:** The complete source code is public at <https://github.com/tigeilen/pa-code>. Your IT/security team can read, clone, and audit the extension before deployment.
 * **Reproducible build:** You can build the VSIX yourself from source to verify it matches what you install — `npm install`, then `npx webpack --mode production`, then `npx vsce package`.
 * **Questions / vendor onboarding:** For due-diligence questions, contact Tim Geilen / tim.geilen@googlemail.com.

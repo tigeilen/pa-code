@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an idea or improvement for PA Code
+description: Suggest an idea or improvement for PA-Code
 labels: ["enhancement"]
 body:
   - type: textarea

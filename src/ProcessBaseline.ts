@@ -70,13 +70,26 @@ export class ProcessBaseline {
      * silently regenerates (order/fields), which otherwise made an untouched
      * process look changed on the server. We drop `Variables` and canonicalise
      * key order so only meaningful changes (parameters, datasource, security)
-     * affect the hash. Falls back to the raw string if it isn't valid JSON.
+     * affect the hash. The encrypted ODBC datasource password is also dropped:
+     * TM1 re-encrypts it non-deterministically on every GET, so it would make an
+     * untouched ODBC process look changed on every open/pull. Falls back to the
+     * raw string if it isn't valid JSON.
      */
     private static canonicalProperties(propertiesJSON: string | undefined): string {
         if (!propertiesJSON) return '';
         try {
             const obj = JSON.parse(propertiesJSON);
-            if (obj && typeof obj === 'object' && !Array.isArray(obj)) delete (obj as any).Variables;
+            if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+                delete (obj as any).Variables;
+                const ds = (obj as any).DataSource;
+                if (ds && typeof ds === 'object') {
+                    // TM1 returns the encrypted password differently on each request.
+                    delete ds.dataSourcePassword;
+                    delete ds.DatasourcePassword;
+                    delete ds.Password;
+                    delete ds.password;
+                }
+            }
             return ProcessBaseline.stableStringify(obj);
         } catch {
             return propertiesJSON.trim();

@@ -243,8 +243,43 @@ export class DeploymentPanel {
         }
     }
 
+    // Does a process' properties define a real (non-None) datasource?
+    private static _hasDataSource(code: any): boolean {
+        try { const p = JSON.parse(code?.PropertiesJSON || '{}'); const ds = p.DataSource; return !!(ds && ds.Type && ds.Type !== 'None'); } catch { return false; }
+    }
+    // Replace the source's untransportable password with the target's own (kept)
+    // password. Records the process for a manual-set warning when none exists.
+    private static _withTargetPassword(srcCode: any, targetCode: any, name: string, todo: string[]): any {
+        try {
+            const sp = JSON.parse(srcCode?.PropertiesJSON || '{}');
+            const tp = JSON.parse(targetCode?.PropertiesJSON || '{}');
+            if (sp.DataSource && typeof sp.DataSource === 'object') {
+                const tpw = tp.DataSource ? (tp.DataSource.dataSourcePassword ?? tp.DataSource.DatasourcePassword) : undefined;
+                delete sp.DataSource.DatasourcePassword; delete sp.DataSource.Password; delete sp.DataSource.password;
+                if (tpw !== undefined && tpw !== '') { sp.DataSource.dataSourcePassword = tpw; }
+                else { delete sp.DataSource.dataSourcePassword; todo.push(name); }
+            }
+            return { ...srcCode, PropertiesJSON: JSON.stringify(sp) };
+        } catch { return srcCode; }
+    }
+    // Strip any datasource password (used for new target processes).
+    private static _withoutPassword(srcCode: any, name: string, todo: string[]): any {
+        try {
+            const sp = JSON.parse(srcCode?.PropertiesJSON || '{}');
+            if (sp.DataSource && typeof sp.DataSource === 'object') {
+                delete sp.DataSource.dataSourcePassword; delete sp.DataSource.DatasourcePassword;
+                delete sp.DataSource.Password; delete sp.DataSource.password;
+                todo.push(name);
+            }
+            return { ...srcCode, PropertiesJSON: JSON.stringify(sp) };
+        } catch { return srcCode; }
+    }
+
     private async _deploy(sourceInstance: string, targetInstance: string, objects: { name: string; type: string; exists: boolean }[]) {
         const results: any[] = [];
+        // Processes whose datasource password couldn't be transported (ODBC passwords
+        // are encrypted per-server) — the user must set the password on the target.
+        const passwordTodo: string[] = [];
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
@@ -258,14 +293,22 @@ export class DeploymentPanel {
                 try {
                     if (obj.type === 'process') {
                         const srcCode = await TM1Service.getInstance().getProcessCode(sourceInstance, obj.name);
+                        const hasDs = DeploymentPanel._hasDataSource(srcCode);
                         let previousCode: any = null;
 
                         if (obj.exists) {
                             previousCode = await TM1Service.getInstance().getProcessCode(targetInstance, obj.name);
-                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, srcCode);
+                            // ODBC/datasource passwords are encrypted per-server and can't be
+                            // transported. Keep the TARGET's existing password (its own blob
+                            // round-trips on its own server) instead of pushing the source's.
+                            const deployCode = hasDs ? DeploymentPanel._withTargetPassword(srcCode, previousCode, obj.name, passwordTodo) : srcCode;
+                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, deployCode);
                         } else {
                             await TM1Service.getInstance().createProcess(targetInstance, obj.name);
-                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, srcCode);
+                            // New target: the source password can't be decrypted here — strip it
+                            // so we don't write a broken one; the user sets it on the target.
+                            const deployCode = hasDs ? DeploymentPanel._withoutPassword(srcCode, obj.name, passwordTodo) : srcCode;
+                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, deployCode);
                         }
                         results.push({ name: obj.name, type: 'process', action: obj.exists ? 'updated' : 'created', success: true, previousCode, newCode: srcCode });
                     } else {
@@ -302,6 +345,16 @@ export class DeploymentPanel {
             vscode.window.showInformationMessage(`Deployment complete: ${succeeded} object(s) deployed successfully.${wroteFiles ? ' Local files updated.' : ''}`);
         } else {
             vscode.window.showWarningMessage(`Deployment complete: ${succeeded} succeeded, ${failed} failed.`);
+        }
+
+        // ODBC/datasource passwords can't be transported between servers — tell the
+        // user which deployed processes still need their password set on the target.
+        if (passwordTodo.length > 0) {
+            const list = passwordTodo.join(', ');
+            vscode.window.showWarningMessage(
+                `Datasource password not transported for ${passwordTodo.length} process(es): ${list}. Set the password on the target (ODBC passwords are encrypted per server and can't be moved).`,
+                { modal: true }
+            );
         }
     }
 
@@ -489,7 +542,7 @@ export class DeploymentPanel {
 <h2>&#128640; Deployment Assistant</h2>
 
 <div class="info-bar">
-    Select source and target instances, choose objects, review changes, and deploy. Both instances must be connected via the PA Code Explorer.
+    Select source and target instances, choose objects, review changes, and deploy. Both instances must be connected via the PA-Code Explorer.
 </div>
 
 <!-- STEP 1: Source & Target -->

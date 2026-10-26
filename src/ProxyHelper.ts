@@ -29,7 +29,7 @@ export class ProxyHelper {
 
     private static getOutput(): vscode.OutputChannel {
         if (!ProxyHelper._output) {
-            ProxyHelper._output = vscode.window.createOutputChannel('PA Code (Proxy)');
+            ProxyHelper._output = vscode.window.createOutputChannel('PA-Code (Proxy)');
         }
         return ProxyHelper._output;
     }
@@ -159,7 +159,7 @@ export class ProxyHelper {
     public static logConfigSummary(): void {
         const cfg = vscode.workspace.getConfiguration('http');
         const out = ProxyHelper.getOutput();
-        out.appendLine('=== PA Code Proxy Configuration ===');
+        out.appendLine('=== PA-Code Proxy Configuration ===');
         out.appendLine(`VS Code http.proxy:        ${cfg.get<string>('proxy') || '(not set)'}`);
         out.appendLine(`VS Code http.noProxy:      ${JSON.stringify(cfg.get<string[]>('noProxy') || [])}`);
         out.appendLine(`VS Code http.proxyStrictSSL: ${cfg.get<boolean>('proxyStrictSSL', true)}`);

@@ -2,9 +2,9 @@
   "name": "pa-code",
   "publisher": "TimGeilen",
   "author": "Tim Geilen",
-  "displayName": "pa-code",
+  "displayName": "PA-Code",
   "description": "TM1 Process Editor with Git Integration",
-  "version": "3.8.6",
+  "version": "3.8.5",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -112,7 +112,7 @@
       "activitybar": [
         {
           "id": "pa-code-sidebar",
-          "title": "PA Code",
+          "title": "PA-Code",
           "icon": "pa_code_sidebar.svg"
         }
       ]
@@ -193,17 +193,22 @@
         "icon": "$(copy)"
       },
       {
+        "command": "pa-code.copyObjectName",
+        "title": "Copy Name",
+        "icon": "$(copy)"
+      },
+      {
         "command": "pa-code.publishChangedFiles",
-        "title": "PA Code: Publish Changed Files",
+        "title": "PA-Code: Publish Changed Files",
         "icon": "$(cloud-upload)"
       },
       {
         "command": "pa-code.toggleAutoPush",
-        "title": "PA Code: Toggle Auto-Push on Save"
+        "title": "PA-Code: Toggle Auto-Push on Save"
       },
       {
         "command": "pa-code.toggleOfflineProtection",
-        "title": "PA Code: Toggle Offline Protection (protect from Pull)",
+        "title": "PA-Code: Toggle Offline Protection (protect from Pull)",
         "icon": "$(lock)"
       },
       {
@@ -218,27 +223,27 @@
       },
       {
         "command": "pa-code.showProxyLog",
-        "title": "PA Code: Show Proxy Diagnostic Log"
+        "title": "PA-Code: Show Proxy Diagnostic Log"
       },
       {
         "command": "pa-code.whatsNew",
-        "title": "PA Code: What's New"
+        "title": "PA-Code: What's New"
       },
       {
         "command": "pa-code.showMcpEndpoint",
-        "title": "PA Code: Show MCP Endpoint (for external AI tools)"
+        "title": "PA-Code: Show MCP Endpoint (for external AI tools)"
       },
       {
         "command": "pa-code.showIntegratedLoginLog",
-        "title": "PA Code: Show Integrated Login Diagnostic Log"
+        "title": "PA-Code: Show Integrated Login Diagnostic Log"
       },
       {
         "command": "pa-code.moveConnectionsToVSCode",
-        "title": "PA Code: Move Connections into VS Code (from tm1-project.json)"
+        "title": "PA-Code: Move Connections into VS Code (from tm1-project.json)"
       },
       {
         "command": "pa-code.clearOAuthCredentials",
-        "title": "PA Code: Clear Stored OAuth Credentials"
+        "title": "PA-Code: Clear Stored OAuth Credentials"
       },
       {
         "command": "pa-code.clearSearch",
@@ -332,31 +337,31 @@
       },
       {
         "command": "pa-code.shortcutSearch",
-        "title": "PA Code: Search Processes"
+        "title": "PA-Code: Search Processes"
       },
       {
         "command": "pa-code.shortcutCreateProcess",
-        "title": "PA Code: New Process"
+        "title": "PA-Code: New Process"
       },
       {
         "command": "pa-code.shortcutPullAll",
-        "title": "PA Code: Pull All from Server"
+        "title": "PA-Code: Pull All from Server"
       },
       {
         "command": "pa-code.shortcutServerLog",
-        "title": "PA Code: Open Server Log"
+        "title": "PA-Code: Open Server Log"
       },
       {
         "command": "pa-code.shortcutThreadViewer",
-        "title": "PA Code: Open Thread Viewer"
+        "title": "PA-Code: Open Thread Viewer"
       },
       {
         "command": "pa-code.shortcutTiConsole",
-        "title": "PA Code: Open TI Console"
+        "title": "PA-Code: Open TI Console"
       },
       {
         "command": "pa-code.shortcutDeployment",
-        "title": "PA Code: Open Deployment Assistant"
+        "title": "PA-Code: Open Deployment Assistant"
       },
       {
         "command": "pa-code.bulkDelete",
@@ -381,25 +386,25 @@
       {
         "command": "pa-code.processLineage",
         "title": "Show Lineage (Process Call Tree)",
-        "category": "PA Code",
+        "category": "PA-Code",
         "icon": "$(type-hierarchy)"
       },
       {
         "command": "pa-code.ruleLineage",
         "title": "Show Rule Lineage (Cube)",
-        "category": "PA Code",
+        "category": "PA-Code",
         "icon": "$(type-hierarchy)"
       },
       {
         "command": "pa-code.createRule",
         "title": "Create Rule",
-        "category": "PA Code",
+        "category": "PA-Code",
         "icon": "$(add)"
       },
       {
         "command": "pa-code.checkRuleSyntax",
         "title": "Check Rule Syntax (no save / no feed)",
-        "category": "PA Code",
+        "category": "PA-Code",
         "icon": "$(check-all)"
       },
       {
@@ -439,7 +444,7 @@
       },
       {
         "command": "pa-code.processProperties",
-        "title": "PA Code: Edit Process Properties",
+        "title": "PA-Code: Edit Process Properties",
         "icon": "$(settings-gear)"
       },
       {
@@ -494,6 +499,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "pa-code.copyObjectName",
+          "when": "view == tm1ProcessView && (viewItem == tm1process || viewItem == tm1rule || viewItem == tm1cube || viewItem == tm1dimension || viewItem == tm1hierarchy || viewItem == tm1view || viewItem == tm1subset)",
+          "group": "9_copy@1"
+        },
         {
           "command": "pa-code.instanceHub",
           "when": "view == tm1ProcessView && (viewItem == tm1instance_connected || viewItem == tm1instance_connected_filtered)",
@@ -705,6 +715,18 @@
           "when": "resourceExtname == .rux",
           "group": "navigation@1"
         }
+      ],
+      "editor/title/context": [
+        {
+          "command": "pa-code.copyObjectName",
+          "when": "resourceExtname == .ti || resourceExtname == .rux",
+          "group": "1_pacode@1"
+        },
+        {
+          "command": "pa-code.copyObjectName",
+          "when": "activeWebviewPanelId == tm1CubeViewer || activeWebviewPanelId == tm1SubsetEditor",
+          "group": "1_pacode@1"
+        }
       ]
     },
     "keybindings": [
@@ -757,17 +779,22 @@
       }
     ],
     "configuration": {
-      "title": "PA Code",
+      "title": "PA-Code",
       "properties": {
+        "pa-code.deleteOnServerWhenLocalDeleted": {
+          "type": "boolean",
+          "default": false,
+          "description": "When you delete a process's local .ti file, offer to delete the process on the TM1 server too. Off by default, because switching Git branches 'deletes' files that only exist in another branch and would trigger false prompts. Enable only if you want local file deletions to propagate to the server."
+        },
         "pa-code.syntaxColors.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Apply readable TM1 (.ti/.rux) syntax colors that adapt to your light or dark theme. PA Code writes a small set of TM1-scoped rules to 'editor.tokenColorCustomizations' and swaps them when you switch between a light and a dark theme. Turn this off if you prefer to manage TM1 colors yourself."
+          "description": "Apply readable TM1 (.ti/.rux) syntax colors that adapt to your light or dark theme. PA-Code writes a small set of TM1-scoped rules to 'editor.tokenColorCustomizations' and swaps them when you switch between a light and a dark theme. Turn this off if you prefer to manage TM1 colors yourself."
         },
         "pa-code.mcpServer.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Provide a real MCP server (Tools + Resources + Prompts) backed by the live TM1 connection. Exposes read-only TM1 tools, tm1:// resources (process code, cube rules, cube dimensions, server info) and reusable prompts (explain process, review rules, impact analysis). Available to the built-in Copilot agent AND to any other MCP-aware AI tool (Claude Code/Desktop, Codex, Cline, Continue, …) via 'PA Code: Show MCP Endpoint'. Read-only by default; opt into write / model-building tools with 'pa-code.mcpServer.mode'."
+          "description": "Provide a real MCP server (Tools + Resources + Prompts) backed by the live TM1 connection. Exposes read-only TM1 tools, tm1:// resources (process code, cube rules, cube dimensions, server info) and reusable prompts (explain process, review rules, impact analysis). Available to the built-in Copilot agent AND to any other MCP-aware AI tool (Claude Code/Desktop, Codex, Cline, Continue, …) via 'PA-Code: Show MCP Endpoint'. Read-only by default; opt into write / model-building tools with 'pa-code.mcpServer.mode'."
         },
         "pa-code.mcpServer.port": {
           "type": "number",
@@ -804,7 +831,7 @@
         "pa-code.projectFile.location": {
           "type": "string",
           "default": "",
-          "description": "Legacy only: where to store the 'tm1-project.json' file when you keep file-based connections. Empty (default) uses the workspace root. Set a folder (e.g. your non-git Local Workspace Folder) or a full path ending in '.json'. New connections are stored in VS Code by default and do not create this file; see 'PA Code: Move Connections into VS Code'."
+          "description": "Legacy only: where to store the 'tm1-project.json' file when you keep file-based connections. Empty (default) uses the workspace root. Set a folder (e.g. your non-git Local Workspace Folder) or a full path ending in '.json'. New connections are stored in VS Code by default and do not create this file; see 'PA-Code: Move Connections into VS Code'."
         },
         "pa-code.connections.defaultScope": {
           "type": "string",
@@ -822,7 +849,7 @@
         "pa-code.autoPushOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "When enabled (default), saving a .ti / .rux file pushes it to the connected TM1 server. Turn it off to work in a manual-publish workflow: edits stay local (and can be committed to git) until you run 'PA Code: Publish Changed Files'. Toggle via the 'TM1: Auto-Push' status bar item."
+          "description": "When enabled (default), saving a .ti / .rux file pushes it to the connected TM1 server. Turn it off to work in a manual-publish workflow: edits stay local (and can be committed to git) until you run 'PA-Code: Publish Changed Files'. Toggle via the 'TM1: Auto-Push' status bar item."
         },
         "pa-code.auth.privateBrowserWindow": {
           "type": "boolean",
@@ -877,7 +904,7 @@
         "pa-code.proxy.debug": {
           "type": "boolean",
           "default": false,
-          "description": "Enable proxy diagnostic logging. When enabled, every request logs its DIRECT/PROXY routing decision to the 'PA Code (Proxy)' output channel. Use the command 'PA Code: Show Proxy Diagnostic Log' to view it."
+          "description": "Enable proxy diagnostic logging. When enabled, every request logs its DIRECT/PROXY routing decision to the 'PA-Code (Proxy)' output channel. Use the command 'PA-Code: Show Proxy Diagnostic Log' to view it."
         }
       }
     }

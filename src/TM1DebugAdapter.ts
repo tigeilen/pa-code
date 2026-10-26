@@ -180,7 +180,7 @@ export class TM1DebugAdapter implements vscode.DebugAdapter {
 
         // Verify connection
         if (!TM1Service.getInstance().isConnected(this.instanceName)) {
-            throw new Error(`Not connected to ${serverRealName}. Please connect via PA Code Explorer first.`);
+            throw new Error(`Not connected to ${serverRealName}. Please connect via PA-Code Explorer first.`);
         }
 
         // Read file content and compute section offsets

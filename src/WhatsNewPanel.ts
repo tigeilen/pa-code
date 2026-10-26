@@ -23,7 +23,7 @@ export class WhatsNewPanel {
     public static show(version: string) {
         const panel = vscode.window.createWebviewPanel(
             'paCodeWhatsNew',
-            `What's New in PA Code ${version}`,
+            `What's New in PA-Code ${version}`,
             vscode.ViewColumn.One,
             { enableScripts: true, retainContextWhenHidden: true }
         );
@@ -140,7 +140,7 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
                         <li><strong>Browser sign-in</strong> via the OAuth Authorization Code flow — the token is received on a local loopback callback.</li>
                         <li><strong>Configure once</strong> in the environment dialog: PAW Base URL, Client ID, Client Secret, Callback Port (with a ready-to-register callback URL) and an optional TM1 database.</li>
                         <li><strong>Secret kept safe</strong> in VS Code SecretStorage — never in the project file.</li>
-                        <li><strong>Cached &amp; silently refreshed tokens</strong> mean you rarely sign in again, even after a restart. Reset them with <code>PA Code: Clear Stored OAuth Credentials</code>.</li>
+                        <li><strong>Cached &amp; silently refreshed tokens</strong> mean you rarely sign in again, even after a restart. Reset them with <code>PA-Code: Clear Stored OAuth Credentials</code>.</li>
                         <li><strong>Database discovery</strong>: if no database is set, pa-code lists the available TM1 servers and lets you pick one.</li>
                     </ul>
                 </div>
@@ -399,13 +399,13 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
                 <div class="hero">
                     <span class="pill">VERSION 3.8.0 · HEADLINE</span>
                     <h1>🎉 Open source & more delightful</h1>
-                    <p>PA Code is now open source under the Apache License 2.0 — plus little moments of joy (celebrate successful runs) and a batch of feedback fixes for the TI Console, rule check and lineage.</p>
+                    <p>PA-Code is now open source under the Apache License 2.0 — plus little moments of joy (celebrate successful runs) and a batch of feedback fixes for the TI Console, rule check and lineage.</p>
                 </div>
                 <div class="card feature">
                     <h2><span class="emoji">🔓</span> Now open source (Apache-2.0)</h2>
                     <p class="sub">A community project you and your company can review, adopt and contribute to</p>
                     <ul>
-                        <li>PA Code is now developed in the open under the <strong>Apache License 2.0</strong> — permissive, enterprise-friendly, with an explicit patent grant.</li>
+                        <li>PA-Code is now developed in the open under the <strong>Apache License 2.0</strong> — permissive, enterprise-friendly, with an explicit patent grant.</li>
                         <li>Contributions are welcome — see <code>CONTRIBUTING.md</code> (lightweight DCO sign-off). Companies can freely review the code for security.</li>
                     </ul>
                 </div>
@@ -475,7 +475,7 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
                     <h2><span class="emoji">🐞</span> Community fixes (GitHub issues)</h2>
                     <ul>
                         <li><strong>Lineage shows all call levels</strong> — deeply nested sub-process calls are no longer missing (#2).</li>
-                        <li><strong>CAM/SSO to databases on another host</strong> — PA Code connects to the host each database registered with, with clearer network-vs-auth errors and a connection log (#6).</li>
+                        <li><strong>CAM/SSO to databases on another host</strong> — PA-Code connects to the host each database registered with, with clearer network-vs-auth errors and a connection log (#6).</li>
                         <li><strong>“Generated Statements” protection</strong> — saving warns (but never blocks copy&amp;paste) when the GUI-managed block was removed (#1).</li>
                         <li><strong>Browse-only mode</strong> — running processes, favorites, properties and full IntelliSense now work without local files.</li>
                     </ul>
@@ -483,9 +483,49 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
             </div>
         </section>
 
+        <!-- SLIDE 9 (headline: 3.8.5) -->
+        <section class="slide">
+            <div class="wrap">
+                <div class="hero">
+                    <span class="pill">VERSION 3.8.5 · HEADLINE</span>
+                    <h1>🧩 Now on Open VSX — PA-Code in IBM Bob &amp; other VS Code forks</h1>
+                    <p>PA-Code is now published to the <strong>Open VSX Registry</strong>, so it installs straight from the marketplace in VS Code forks like <strong>IBM Bob</strong> — plus handy copy actions and a batch of ODBC &amp; theme fixes.</p>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">🌍</span> Available on Open VSX <span class="emoji">✨</span></h2>
+                    <p class="sub">Install from the marketplace in forks that don't use the Microsoft Marketplace</p>
+                    <ul>
+                        <li>PA-Code can now be installed directly in <strong>IBM Bob</strong>, VSCodium, Cursor and other VS Code forks — no more manual VSIX.</li>
+                        <li>Every future release is published to Open VSX automatically.</li>
+                    </ul>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">📋</span> Copy actions</h2>
+                    <ul>
+                        <li><strong>Copy Name</strong> — right-click a tab (process, rule, Cube Viewer, Subset Editor) or a tree item (cubes, dimensions, hierarchies, views, subsets) to copy its name.</li>
+                        <li><strong>Subset Editor: copy members</strong> — new <strong>⧉ Copy</strong> buttons copy the selected members (or all) to the clipboard, one per line; the MDX <strong>Copy</strong> button works now too.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2><span class="emoji">🔌</span> ODBC datasource fixes</h2>
+                    <ul>
+                        <li>ODBC processes no longer show a <strong>false "differs from server"</strong> prompt on open/pull (the per-request encrypted password is excluded from the compare).</li>
+                        <li><strong>Deployment keeps ODBC passwords working</strong> — the target's own password is preserved; for a brand-new target you get a clear note to set it once.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2><span class="emoji">🎨</span> Theme &amp; workflow</h2>
+                    <ul>
+                        <li><strong>Readable light themes</strong> — TM1 syntax colors now adapt to your active theme (light vs dark) at runtime, for every theme.</li>
+                        <li><strong>No more false "delete on server?" on branch switch</strong> — that behaviour is now opt-in via <code>pa-code.deleteOnServerWhenLocalDeleted</code>.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
     </div>
 </div>
-<div class="hint">Use ‹ / › or your arrow keys to browse between versions · Reopen anytime via <code>PA Code: What's New</code></div>
+<div class="hint">Use ‹ / › or your arrow keys to browse between versions · Reopen anytime via <code>PA-Code: What's New</code></div>
 
 <script>
 (function(){

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with PA Code
+description: Report a problem with PA-Code
 labels: ["bug"]
 body:
   - type: markdown
@@ -26,7 +26,7 @@ body:
   - type: input
     id: pa-code-version
     attributes:
-      label: PA Code version
+      label: PA-Code version
       placeholder: e.g. 3.8.0
     validations:
       required: true
@@ -52,4 +52,4 @@ body:
     id: logs
     attributes:
       label: Logs / screenshots
-      description: Relevant output from the PA Code output channels or screenshots. Redact any secrets or customer data.
+      description: Relevant output from the PA-Code output channels or screenshots. Redact any secrets or customer data.

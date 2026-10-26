@@ -213,7 +213,7 @@ export class EnvironmentWizardPanel {
   <!-- STEP 5: local files -->
   <div class="step" data-step="files">
     <h2>Keep local copies of your TI &amp; rules?</h2>
-    <p class="desc">This controls whether PA Code writes process/rule files to disk for this environment.</p>
+    <p class="desc">This controls whether PA-Code writes process/rule files to disk for this environment.</p>
     <div class="cards">
       <div class="card" data-files="yes"><div class="ic">💾</div><div><div class="t">Yes — store files locally (recommended for DEV)</div><div class="d">Processes and rules are written as <b>.ti</b>/<b>.rux</b> files you can edit, diff and put under <b>Git</b>. Best for development and version control.</div></div></div>
       <div class="card" data-files="no"><div class="ic">👁️</div><div><div class="t">No — browse only (good for TEST/PROD)</div><div class="d">Nothing is written to disk. You can open, run and analyse objects, but edits are pushed straight to the server. Keeps a Dev repo clean.</div></div></div>
@@ -262,13 +262,13 @@ export class EnvironmentWizardPanel {
   var vscode = acquireVsCodeApi();
   var AUTH = {
     onPremise: [
-      { v:'Prompt', t:'Auto-detect (recommended)', d:'PA Code checks the server security mode and asks for credentials or opens a browser login as needed.' },
+      { v:'Prompt', t:'Auto-detect (recommended)', d:'PA-Code checks the server security mode and asks for credentials or opens a browser login as needed.' },
       { v:'Basic', t:'Username & password', d:'You enter a TM1 user and password on connect. Add a CAM namespace below if your server uses one.' },
       { v:'CAM Browser SSO', t:'CAM / SSO (browser)', d:'Opens a browser window to log in via your SSO/MFA provider. Best for CAM-secured servers.' },
       { v:'Integrated Login', t:'Windows Integrated Login', d:'Kerberos SSO from your current Windows session (TM1 Security Mode 2/3) — no username/password, like Architect.' }
     ],
     singleInstance: [
-      { v:'Prompt', t:'Auto-detect (recommended)', d:'PA Code checks the server security mode and asks for credentials or opens a browser login as needed.' },
+      { v:'Prompt', t:'Auto-detect (recommended)', d:'PA-Code checks the server security mode and asks for credentials or opens a browser login as needed.' },
       { v:'Basic', t:'Username & password', d:'You enter a TM1 user and password on connect.' },
       { v:'CAM Browser SSO', t:'CAM / SSO (browser)', d:'Opens a browser window to log in via your SSO/MFA provider.' },
       { v:'Integrated Login', t:'Windows Integrated Login', d:'Kerberos SSO from your current Windows session (no username/password).' }
@@ -339,7 +339,7 @@ export class EnvironmentWizardPanel {
     $('fieldsAdmin').style.display = isUrl ? 'none' : 'block';
     $('fieldsUrl').style.display = isUrl ? 'block' : 'none';
     if (state.type === 'onPremise') {
-      $('connDesc').textContent = 'Point at your TM1 Admin Server. PA Code lists the databases it manages.';
+      $('connDesc').textContent = 'Point at your TM1 Admin Server. PA-Code lists the databases it manages.';
       $('lblHost').innerHTML = 'Admin Host <span class="req">*</span>';
       $('lblPort').innerHTML = 'Port <span class="req">*</span>';
       $('hostHint').textContent = 'The Admin Server host and its port (default 5898).';

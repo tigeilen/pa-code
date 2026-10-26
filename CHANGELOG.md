@@ -4,15 +4,20 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [3.8.6] - 2026-10-14
+## [3.8.5] - 2026-10-21
+
+### Added
+- **Now on the Open VSX Registry** — PA-Code can now be installed straight from the marketplace in **VS Code forks** like **IBM Bob**, VSCodium, Cursor and others (which don't use the Microsoft Marketplace), not just via a VSIX. Every future release is published there automatically.
+- **Copy Name** — copy an object's name from the **tab right-click menu** (processes, rules, Cube Viewer, Subset Editor) or from the **tree context menu** (processes, rules, cubes, dimensions, hierarchies, views, subsets). Previously there was no way to copy the name of the object you had open.
+- **Subset Editor: copy members to the clipboard** — new **⧉ Copy** buttons on both the Available and Current Set lists copy the selected members (or all, if none are selected), one per line. The MDX **Copy** button now works too (both go through the host, which webviews require to reach the clipboard).
 
 ### Fixes
-- **Light theme syntax colors — properly this time.** Theme-scoped token colors contributed via `configurationDefaults` are not reliably applied by VS Code, so light themes still showed the dark palette. PA Code now sets its TM1 (.ti/.rux) syntax colors **at runtime based on your active theme** (light vs dark) and swaps them automatically when you switch themes — so it works with every theme, built-in or custom, by theme *kind* rather than name. You can opt out via **`pa-code.syntaxColors.enabled`**.
+- **ODBC processes no longer show a false "differs from server" prompt.** TM1 returns the encrypted ODBC datasource password differently on every request, so the sync compare flagged every ODBC process as changed on open/pull. The volatile datasource password is now excluded from the comparison (like the auto-managed `Variables`), so only real changes are detected.
+- **Deployment keeps ODBC datasource passwords working.** ODBC passwords are encrypted per-server and can't be transported, which previously left deployed processes failing with a wrong password. The Deployment Assistant now preserves the **target's** existing password when updating a process, omits the password for a brand-new target process, and shows a clear note listing which processes still need their password set on the target.
+- **Light theme syntax colors now adapt correctly.** Theme-scoped token colors contributed via `configurationDefaults` are not reliably applied by VS Code, so light themes still showed the dark palette and were hard to read. PA-Code now sets its TM1 (.ti/.rux) syntax colors **at runtime based on your active theme** (light vs dark) and swaps them automatically when you switch themes — so it works with every theme, built-in or custom, by theme *kind* rather than name. Dark themes are unchanged. You can opt out via **`pa-code.syntaxColors.enabled`**.
 
-## [3.8.5] - 2026-10-14
-
-### Fixes
-- **Light theme syntax colors now actually apply** — the readable light-theme colors were keyed only by theme id (e.g. `Default Light Modern`), so the built-in **Light Modern** / **Light+** themes (matched by their display name) still showed the dark palette and were hard to read. The light colors now cover every built-in light theme by both name and id. Dark themes are unchanged.
+### Changed
+- **"Delete process on server when its local file is deleted" is now off by default.** Switching Git branches "deletes" files that only exist in another branch, which triggered false "delete on server?" prompts. The behaviour is now opt-in via **`pa-code.deleteOnServerWhenLocalDeleted`**.
 
 ## [3.8.4] - 2026-10-09
 
@@ -33,7 +38,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Fixes
 - **Lineage shows all call levels** (#2) — the process call-tree now detects `ExecuteProcess`/`RunProcess` across the whole code, handles TM1's doubled-quote escapes, resolves variable-named calls and ignores commented-out calls, so deeply nested sub-processes are no longer missing.
-- **CAM/SSO connect to databases on another host** (#6) — PA Code now connects to the host each database **registered with** (falling back to the Admin Server host), so databases that live on a different machine than the Admin Server no longer time out. Connection errors now separate network problems (timeout/refused/DNS) from authentication, and a new **"PA Code (Connection)"** output channel logs the chosen endpoint.
+- **CAM/SSO connect to databases on another host** (#6) — PA-Code now connects to the host each database **registered with** (falling back to the Admin Server host), so databases that live on a different machine than the Admin Server no longer time out. Connection errors now separate network problems (timeout/refused/DNS) from authentication, and a new **"PA-Code (Connection)"** output channel logs the chosen endpoint.
 - **"Generated Statements" block protection** (#1) — saving a process warns before pushing when its GUI-managed *Generated Statements* block was removed or left with unbalanced Begin/End markers. It's a confirmation, not a lock, so copy&paste of a whole process still works.
 - **Subset Editor Format** now also breaks `{ … }` member lists onto one member per line (previously only parentheses were formatted); **Minify** reverses it exactly.
 - **Subset Editor sort** cycles ascending → descending → hierarchical (was ascending-only).
@@ -44,7 +49,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Added
 - **Shortcut for "Go to TM1 Line"** — jump to a TM1 section/line with **Ctrl+Alt+G** (Cmd+Alt+G on macOS) while a `.ti` file is focused, the same action as the status-bar item.
-- **Thread Viewer: Disconnect** — each thread row now has a **Disconnect** button next to **Kill**. *Kill* cancels only the running operation; *Disconnect* closes the user's entire TM1 session. Includes a confirmation dialog and a safeguard that prevents disconnecting your own PA Code session.
+- **Thread Viewer: Disconnect** — each thread row now has a **Disconnect** button next to **Kill**. *Kill* cancels only the running operation; *Disconnect* closes the user's entire TM1 session. Includes a confirmation dialog and a safeguard that prevents disconnecting your own PA-Code session.
 - **Create Rule** — right-click a cube → **Create Rule** to add a rule when none exists yet. Opens a starter template; the rule is created on the server on save (no empty file is left behind).
 
 ### Fixes
@@ -59,7 +64,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [3.8.0] - 2026-09-24
 
-**First open-source release** — PA Code is now developed in the open under the Apache License 2.0. 🎉
+**First open-source release** — PA-Code is now developed in the open under the Apache License 2.0. 🎉
 
 ### Delightful UX (opt-in)
 - **Celebrate a successful process** 🎈 (inspired by Streamlit's `st.balloons`): when a TI process finishes successfully, a short animated toast plays and then leaves a **persistent** success message (`🎉 Success! ‘Process’ · time`) that stays readable. **Off by default** — enable with **`pa-code.delight.celebrateProcessSuccess`**; choose the style with **`pa-code.delight.celebrationStyle`**: `balloons` (rising balloons), `fireworks` (rockets → burst), or `panel` (a floating balloons webview).
@@ -75,7 +80,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - **Easier back-navigation**: the lineage now shows a **breadcrumb trail** of the cubes/processes you've visited (current one highlighted) and supports **Alt+← / Alt+→** to step back/forward — so you can always return from a dead-end object.
 
 ### Project
-- **PA Code 3.8.0 is the first open-source release**, under the **Apache License 2.0** — a permissive, enterprise-friendly license with an explicit patent grant, so companies can review and adopt it freely and the community can contribute. Added `LICENSE`, `NOTICE` and `CONTRIBUTING.md` (with a lightweight DCO sign-off).
+- **PA-Code 3.8.0 is the first open-source release**, under the **Apache License 2.0** — a permissive, enterprise-friendly license with an explicit patent grant, so companies can review and adopt it freely and the community can contribute. Added `LICENSE`, `NOTICE` and `CONTRIBUTING.md` (with a lightweight DCO sign-off).
 
 ## [3.7.4] - 2026-09-23
 
@@ -135,7 +140,7 @@ A big release focused on **AI-driven model building** and **admin/testing power 
 - **Safety**: destructive/irreversible tools (all deletes, cell writes, rule replacement, process/chore execution, config changes) require a `confirm` argument that repeats the target name. `tm1_execute_process` reports a real `outcome` (succeeded / completed_with_errors / rolled_back) since TM1 answers HTTP 200 regardless.
 
 ### TI Console (one-liner)
-- **New TI Console** (Arc-style): run a single TurboIntegrator statement — e.g. `CubeProcessFeeders('Balancesheet');` — without creating a process. pa-code creates a temporary process behind the scenes, compiles and runs it, then deletes it. Open it from the **terminal icon** / right-click on a connected instance, from **Quick Actions**, or via **PA Code: Open TI Console**. Run with `Ctrl+Enter`; syntax and execution errors (including the TM1 error log) are shown inline.
+- **New TI Console** (Arc-style): run a single TurboIntegrator statement — e.g. `CubeProcessFeeders('Balancesheet');` — without creating a process. pa-code creates a temporary process behind the scenes, compiles and runs it, then deletes it. Open it from the **terminal icon** / right-click on a connected instance, from **Quick Actions**, or via **PA-Code: Open TI Console**. Run with `Ctrl+Enter`; syntax and execution errors (including the TM1 error log) are shown inline.
 
 ### Impersonation — view TM1 as another user (v11)
 - **New Impersonate User** (Arc-style): enter a user name and see the model exactly as that user does — cubes, cell contents, elements, private views/subsets and rights. pa-code opens a **new impersonated session** (re-authenticating with the connection's credentials plus the `TM1-Impersonate` header), so the server truly applies that user's security. A **status-bar badge** shows who you're impersonating; **Stop Impersonating** re-authenticates back to your own admin session. Available in **Quick Actions**, the connected-instance right-click menu, and the command palette. Requires a Basic/native or API-key connection; not supported on v12 / Planning Analytics as a Service.
@@ -317,13 +322,13 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 - Reminder for Kerberos setups: use **Single Instance** with the server's **FQDN** (not the short name) as the host, and ensure the TM1 host's `HTTP/<fqdn>` SPN is registered — the FQDN is what the Kerberos ticket/SPN lookup uses.
 
 ### Added
-- **Integrated Login diagnostic log**: a dedicated **"PA Code (Integrated Login)"** output channel now records each authentication attempt — endpoint, host/SPN, parsed user/domain, whether the Kerberos component loaded, each Kerberos/NTLM leg and HTTP status, and the final outcome (no passwords or tokens are logged). It opens automatically when a login fails, and can be shown anytime via **PA Code: Show Integrated Login Diagnostic Log** — making it much easier to analyse a failed sign-in.
+- **Integrated Login diagnostic log**: a dedicated **"PA-Code (Integrated Login)"** output channel now records each authentication attempt — endpoint, host/SPN, parsed user/domain, whether the Kerberos component loaded, each Kerberos/NTLM leg and HTTP status, and the final outcome (no passwords or tokens are logged). It opens automatically when a login fails, and can be shown anytime via **PA-Code: Show Integrated Login Diagnostic Log** — making it much easier to analyse a failed sign-in.
 
 ## [3.4.4] - 2026-07-29
 
 ### MCP Server usable from any AI tool (not just Copilot), incl. Codex
 - **Connect the built-in MCP server from external AI tools**: the read-only TM1 MCP server (23 tools, `tm1://` resources, prompts) can now be used by any MCP-aware client — Claude Code / Claude Desktop, Codex, Cline, Continue, Cursor, … — so users who don't use GitHub Copilot can still give their AI live context about the TM1 model. The Copilot Agent integration keeps working unchanged.
-- **New command `PA Code: Show MCP Endpoint (for external AI tools)`**: reveals the endpoint and copies a ready-to-use configuration — a generic `mcpServers` HTTP JSON block (Claude Desktop, Cline, Continue, Cursor…), a `claude mcp add --transport http …` one-liner, a **Codex** pair (`setx <VAR> <token>` + `codex mcp add pa_code_tm1 --url <url> --bearer-token-env-var <VAR>`), or an `npx mcp-remote …` stdio-bridge command. Also copies the URL/token and can regenerate the token.
+- **New command `PA-Code: Show MCP Endpoint (for external AI tools)`**: reveals the endpoint and copies a ready-to-use configuration — a generic `mcpServers` HTTP JSON block (Claude Desktop, Cline, Continue, Cursor…), a `claude mcp add --transport http …` one-liner, a **Codex** pair (`setx <VAR> <token>` + `codex mcp add pa_code_tm1 --url <url> --bearer-token-env-var <VAR>`), or an `npx mcp-remote …` stdio-bridge command. Also copies the URL/token and can regenerate the token.
 - **Persisted token**: the bearer token is stored in VS Code SecretStorage, so an external client configured once keeps working across restarts. Rotate it anytime from the endpoint command.
 - **New setting `pa-code.mcpServer.port`**: pin the loopback port (e.g. `3900`) for a stable external URL. Default `0` keeps the OS-assigned random port.
 - **New setting `pa-code.mcpServer.autoStart`**: start the MCP listener as soon as the extension activates (instead of lazily), so external tools such as Codex — which connect on their own and don't wait for VS Code/Copilot to request the server — find the endpoint already listening.
@@ -372,7 +377,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 - **Pretty SQL**: the ODBC data-source query is now a multi-line editor with a **Format SQL** button.
 
 ### Offline / manual-publish workflow
-- **Auto-Push toggle** (status bar): turn off pushing on save to edit offline and commit to git, then run **PA Code: Publish Changed Files** to push all changed `.ti`/`.rux` at once — with the same conflict guard.
+- **Auto-Push toggle** (status bar): turn off pushing on save to edit offline and commit to git, then run **PA-Code: Publish Changed Files** to push all changed `.ti`/`.rux` at once — with the same conflict guard.
 
 ### Deployment Assistant
 - **Multi-select** browser (checkbox list + filter + Select All) to add many objects at once, and **Load from Log** to reuse a previous deployment set for re-deployment or promotion.
@@ -385,7 +390,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 
 ### OAuth (PAW) & Windows Integrated Login
 - **OAuth 2.0 for Planning Analytics Workspace**: connect to IBM PAW and its PAW-routed TM1 databases via the Authorization Code flow. Sign-in opens your system browser and completes on a local loopback callback. Configure PAW Base URL, Client ID, Client Secret, Callback Port (with a ready-to-register callback URL) and an optional TM1 database; the client secret is stored in VS Code SecretStorage (never in the project file).
-- **No repeated logins**: access tokens are cached and silently refreshed via the refresh token, so reconnecting rarely needs another browser sign-in — even after a VS Code restart. Reset stored credentials with **PA Code: Clear Stored OAuth Credentials**.
+- **No repeated logins**: access tokens are cached and silently refreshed via the refresh token, so reconnecting rarely needs another browser sign-in — even after a VS Code restart. Reset stored credentials with **PA-Code: Clear Stored OAuth Credentials**.
 - **Database discovery**: if no database is set, pa-code lists the available TM1 servers via `/api/v1/tm1/Servers` and lets you pick one; the connection then uses the PAW-routed TM1 REST base `/api/v1/tm1/<server>/api/v1`.
 - **Windows Integrated Login (Security Mode 3)**: new authentication method for TM1 servers running IntegratedSecurityMode 3 — sign in with your Windows/AD credentials (e.g. `user@domain`), sent via Basic auth with no CAM namespace.
 
@@ -417,7 +422,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 - **MDX Inspector**: View and copy the generated MDX at any time.
 
 ### General
-- **What's New Page**: After updating, a "What's New" tab opens once to highlight the new features. It can be reopened anytime via the Command Palette → **PA Code: What's New**.
+- **What's New Page**: After updating, a "What's New" tab opens once to highlight the new features. It can be reopened anytime via the Command Palette → **PA-Code: What's New**.
 
 ## [3.0.6] - 2026-07-09
 
@@ -425,7 +430,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 - **Respects VS Code Proxy Settings**: All HTTP(S) requests now honor VS Code's `http.proxy` and `http.noProxy` settings, not just OS environment variables. Internal TM1 servers listed in `http.noProxy` are no longer incorrectly routed through a corporate proxy.
 - **Proxy Precedence**: Proxy URL is taken from `http.proxy` first, then `HTTPS_PROXY`/`HTTP_PROXY` env vars. The no-proxy list combines `http.noProxy`, `NO_PROXY` env var, and always bypasses `localhost`/`127.0.0.1`/`::1`.
 - **No-Proxy Matching**: Supports exact hosts, `*.domain`, `.domain`, and bare-domain suffix matching (e.g. `example.com` matches `tm1.example.com`).
-- **Proxy Diagnostic Log**: New setting `pa-code.proxy.debug` and command **"PA Code: Show Proxy Diagnostic Log"**. When enabled, every request logs its DIRECT/PROXY routing decision to a dedicated output channel, and a full configuration summary can be shown for troubleshooting.
+- **Proxy Diagnostic Log**: New setting `pa-code.proxy.debug` and command **"PA-Code: Show Proxy Diagnostic Log"**. When enabled, every request logs its DIRECT/PROXY routing decision to a dedicated output channel, and a full configuration summary can be shown for troubleshooting.
 
 ## [3.0.5] - 2026-06-29
 
@@ -544,7 +549,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 - **Bulk Object Deletion**: New webview panel for bulk-deleting TM1 objects (Processes, Views, Subsets). Includes object type and context selection, table with checkboxes, search, and sort.
 
 ### Activity Bar & Sidebar
-- **Dedicated PA Code Sidebar**: PA Code gets its own activity bar icon and sidebar with organized sections: Connections, Recently Used, Favorites, Quick Actions, and TM1 Function Reference.
+- **Dedicated PA-Code Sidebar**: PA-Code gets its own activity bar icon and sidebar with organized sections: Connections, Recently Used, Favorites, Quick Actions, and TM1 Function Reference.
 - **Quick Actions**: Direct access to Search, New Process, Pull All, Server Log, Thread Viewer, Deployment Assistant, MDX Wizard, Chore Manager, and Settings from the sidebar.
 - **Favorites**: Pin frequently-used processes for quick access via star icon. Remove with star-delete icon.
 
@@ -628,7 +633,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 ## [1.7.0] - 2026-05-19
 
 ### Thread Viewer
-- **Thread Monitoring Panel**: New webview panel showing all active TM1 threads in a real-time table with auto-refresh every 3 seconds. Accessible via the list icon on connected instances in the PA Code Explorer.
+- **Thread Monitoring Panel**: New webview panel showing all active TM1 threads in a real-time table with auto-refresh every 3 seconds. Accessible via the list icon on connected instances in the PA-Code Explorer.
 - **Sortable & Filterable**: Click column headers to sort by any field (ID, Name, State, Type, Function, Elapsed, Context). Use the search box to filter threads across all columns.
 - **Kill Threads**: Cancel any thread directly — either click the "✖ Kill" button in its row, or enter a Thread ID manually and press "✕ Kill Thread".
 - **ISO Duration Parsing**: Wait and Elapsed columns automatically parse TM1's ISO 8601 duration format (`P0DT00H00M00S`) into human-readable seconds.
@@ -667,7 +672,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 - **Auto-Enable TI Debugging**: If `EnableTIDebugging` is not active on the server, the extension offers to enable it automatically before starting the debug session.
 
 ### Server Configuration Management
-- **Configuration Panel**: New webview panel to view and edit all TM1 server configuration parameters (`StaticConfiguration`). Accessible via the gear icon on connected instances in the PA Code Explorer.
+- **Configuration Panel**: New webview panel to view and edit all TM1 server configuration parameters (`StaticConfiguration`). Accessible via the gear icon on connected instances in the PA-Code Explorer.
 - **Searchable Parameter Table**: Filter parameters by name with a real-time search box. Each parameter shows its name, current value, and data type (bool/number/string).
 - **Inline Editing**: Click "Edit" on any parameter to change its value via a modal dialog with type-appropriate controls (dropdown for booleans, number input for numerics, text input for strings).
 - **Auto Section Discovery**: Parameters are automatically mapped to their correct configuration section for updates, even for parameters using default values that don't appear in the config file.
@@ -718,7 +723,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 
 - Feature: **Process Parameter Popup** - When executing a TM1 process that has parameters defined, a webview panel now appears allowing you to set parameter values before running. Input fields are rendered per parameter type (Numeric/String) and styled using the active VS Code theme.
 - Feature: **Push to TM1 Server (Create from Local File)** - Right-click any `.ti` file in the Explorer to push it directly to the connected TM1 server. If the process does not yet exist on the server, you are prompted to create it. The same prompt also appears automatically if you save a `.ti` file whose process cannot be found on the server (e.g. after copying and renaming a file).
-- Feature: **Control Objects in Tree View** - Control objects (names starting with `}`) are now visible in dedicated **Control Processes** and **Control Cubes** folders in the PA Code Explorer, separate from normal objects.
+- Feature: **Control Objects in Tree View** - Control objects (names starting with `}`) are now visible in dedicated **Control Processes** and **Control Cubes** folders in the PA-Code Explorer, separate from normal objects.
 - Feature: **Control Object Sync Selection** - When using "Pull All from Server", you can now choose whether to include Control Objects in the sync. If included, control processes are saved to a local `Control Processes` folder and control rules to a `Control Rules` folder, keeping them cleanly separated from normal objects.
 - Feature: **Single Instance Connection Type** - A new "Single Instance (Host + Port)" option has been added to the Environment settings. This allows you to connect directly to a specific TM1 instance by host and HTTP port, bypassing the Admin Server discovery entirely. The Environment Name is used as the instance label in the Tree View.
 - Feature: **TM1 Line Tracker (Status Bar)** - When a `.ti` file is open, the bottom status bar now shows the TM1-relative line number and procedure section for the current cursor position (e.g. `TM1: Prolog · Line 21`). The tracker correctly identifies `#JSON_PROPERTIES` as a separate block and does not count it as part of the Epilog.
@@ -730,7 +735,7 @@ A major feature release: a new **Lineage** view with runtime run-analysis, conne
 
 ## [1.2.7]
 - Feature: **Cloud Authentication Profiles** - Added an Authentication Method dropdown for Custom REST URL configurations. Simply set it up once as `IBM Cloud (Non-Interactive LDAP)` or `API Key / Token` in VSCode Workspace Settings, and let the extension automatically route, bypass the dialogs, and configure proper Cloud namespaces automatically.
-- UI Enhancement: **Styled Settings Dropdowns** - Updated the dropdowns in the PA Code environments configuration panel to inherit the active VS Code theme colors (dark grey backgrounds, native borders), matching the rest of the native VS Code aesthetic perfectly.
+- UI Enhancement: **Styled Settings Dropdowns** - Updated the dropdowns in the PA-Code environments configuration panel to inherit the active VS Code theme colors (dark grey backgrounds, native borders), matching the rest of the native VS Code aesthetic perfectly.
 
 ## [1.2.6]
 - Fix: **Custom REST URL Timeout** - Increased the connection timeout for checking TM1 instances via REST (including CAM security check) from 5 seconds to 15 seconds to be more robust. Also, fixed an issue where trailing slashes or `/api/v1` were improperly appended to URLs when calculating the REST endpoint, which resolves some connection failures.

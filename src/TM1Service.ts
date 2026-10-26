@@ -43,7 +43,7 @@ export class TM1Service {
     private static integratedLog: vscode.OutputChannel | undefined;
     private static logIntegrated(msg: string): void {
         if (!TM1Service.integratedLog) {
-            TM1Service.integratedLog = vscode.window.createOutputChannel('PA Code (Integrated Login)');
+            TM1Service.integratedLog = vscode.window.createOutputChannel('PA-Code (Integrated Login)');
         }
         TM1Service.integratedLog.appendLine(`[${new Date().toISOString()}] ${msg}`);
     }
@@ -1145,7 +1145,7 @@ export class TM1Service {
 
         const activeId = await this.getActiveSessionId(instanceName);
         if (activeId !== undefined && String(activeId) === String(session.ID)) {
-            throw new Error('This thread belongs to your own PA Code session — disconnecting it would drop your connection.');
+            throw new Error('This thread belongs to your own PA-Code session — disconnecting it would drop your connection.');
         }
         try {
             await axios.post(`${cfg.url}/api/v1/Sessions('${session.ID}')/tm1.Close`, {}, {

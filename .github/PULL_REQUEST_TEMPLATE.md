@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to PA Code! -->
+<!-- Thanks for contributing to PA-Code! -->
 
 ## Summary
 

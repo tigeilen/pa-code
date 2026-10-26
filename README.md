@@ -4,7 +4,7 @@
 
 **Author: Tim Geilen**
 
-PA-Code brings the power of a modern code editor to TM1 development. If you've been working in Architect or PAW to write TI processes and rules, PA Code gives you a faster, more organized workflow — with autocomplete, debugging, version control, and multi-instance management built right in.
+PA-Code brings the power of a modern code editor to TM1 development. If you've been working in Architect or PAW to write TI processes and rules, PA-Code gives you a faster, more organized workflow — with autocomplete, debugging, version control, and multi-instance management built right in.
 
 No prior VS Code experience required. This guide will get you up and running.
 
@@ -15,34 +15,34 @@ No prior VS Code experience required. This guide will get you up and running.
 ### What You Need
 
 1. **VS Code** — Download free from [code.visualstudio.com](https://code.visualstudio.com/)
-2. **PA Code Extension** — Install from the VS Code Marketplace (search "PA Code")
+2. **PA-Code Extension** — Install from the VS Code Marketplace (search "PA-Code")
 3. **Network access** to your TM1 server(s) (REST API port must be reachable)
 
 Optional:
 - **Git** — For version control and team collaboration ([git-scm.com](https://git-scm.com/))
 
-### Step 1: Install PA Code
+### Step 1: Install PA-Code
 
 1. Open VS Code
 2. Click the **Extensions** icon in the left sidebar (or press `Ctrl+Shift+X`)
-3. Search for **"PA Code"**
+3. Search for **"PA-Code"**
 4. Click **Install**
 
-After installation, you'll see a new **PA Code icon** in the left activity bar — that's your main entry point.
+After installation, you'll see a new **PA-Code icon** in the left activity bar — that's your main entry point.
 
 ### Step 2: Open a Folder for Your Local Files
 
-PA Code stores every process and rule you pull as a **local file** on your computer, so VS Code needs an **open folder** to put them in. This step is easy to miss if you're new to VS Code — do it **before** configuring a connection.
+PA-Code stores every process and rule you pull as a **local file** on your computer, so VS Code needs an **open folder** to put them in. This step is easy to miss if you're new to VS Code — do it **before** configuring a connection.
 
 1. Create an empty folder on your machine (e.g. `C:\TM1-Projects\MyModel`).
 2. In VS Code, choose **File → Open Folder…** and select that folder.
 3. VS Code reloads with your folder open — its name now appears in the **Explorer** on the left.
 
-> **Why this matters**: Without an open folder, PA Code has nowhere to save the pulled `.ti` / `.rux` files, so pulling and opening won't work. Tip: use one folder per model/project and initialize Git in it for version control.
+> **Why this matters**: Without an open folder, PA-Code has nowhere to save the pulled `.ti` / `.rux` files, so pulling and opening won't work. Tip: use one folder per model/project and initialize Git in it for version control.
 
 ### Step 3: Configure Your TM1 Connection
 
-1. Click the **PA Code icon** in the activity bar (left side)
+1. Click the **PA-Code icon** in the activity bar (left side)
 2. In the sidebar that opens, click the **⚙️ gear icon** at the top
 3. The Settings panel opens — here you add your TM1 environments:
    - **Name**: A label like `DEV` or `PROD`
@@ -59,7 +59,7 @@ PA Code stores every process and rule you pull as a **local file** on your compu
 
 ### Step 4: Connect to Your Server
 
-1. In the PA Code sidebar, expand your environment
+1. In the PA-Code sidebar, expand your environment
 2. You'll see your TM1 server(s) listed
 3. Click the **plug icon** (or right-click → Connect)
 4. Enter your credentials:
@@ -76,7 +76,7 @@ You're now connected! Your processes and rules are listed in the tree below.
 
 ### Opening a Process or Rule
 
-Click any process name in the tree to open it. PA Code downloads the code from the server and opens it in the editor. You'll see:
+Click any process name in the tree to open it. PA-Code downloads the code from the server and opens it in the editor. You'll see:
 - All four procedure sections (`Prolog`, `Metadata`, `Data`, `Epilog`) in one file
 - Syntax highlighting for all TI functions
 - A `► Run` and `🐛 Debug` button at the top (CodeLens)
@@ -86,7 +86,7 @@ Click any process name in the tree to open it. PA Code downloads the code from t
 1. Make your changes in the editor
 2. Press `Ctrl+S` to save
 
-That's it. PA Code automatically:
+That's it. PA-Code automatically:
 - Saves the file locally on your disk
 - Pushes the change to the TM1 server
 - Validates the syntax and shows errors inline (red underline with message)
@@ -99,7 +99,7 @@ Three ways to run a process:
 2. **Tree view**: Right-click a process → Execute
 3. **Recently Used**: Click the ► icon on any previously-run process in the sidebar
 
-If the process has parameters, a form appears where you can fill them in. PA Code remembers your last used values.
+If the process has parameters, a form appears where you can fill them in. PA-Code remembers your last used values.
 
 ### Debugging a Process
 
@@ -113,13 +113,13 @@ If the process has parameters, a form appears where you can fill them in. PA Cod
    - **Shift+F5** — Stop
 5. Watch variables update in real-time in the left panel
 
-> Requires `EnableTIDebugging=T` on the server. PA Code will offer to enable it for you.
+> Requires `EnableTIDebugging=T` on the server. PA-Code will offer to enable it for you.
 
 ---
 
-## The PA Code Sidebar
+## The PA-Code Sidebar
 
-The sidebar (click the PA Code icon in the activity bar) is your central navigation:
+The sidebar (click the PA-Code icon in the activity bar) is your central navigation:
 
 | Section | What it does |
 |---------|-------------|
@@ -135,7 +135,7 @@ The sidebar (click the PA Code icon in the activity bar) is your central navigat
 
 ### IntelliSense & Autocomplete
 
-As you type, PA Code suggests:
+As you type, PA-Code suggests:
 - All TI and Rule functions with syntax tooltips
 - Cube names, dimension names, subsets, and elements from your server
 - Variable names from your current file
@@ -206,7 +206,7 @@ Press `Shift+Alt+F` to auto-format your TI code with consistent indentation, cas
 
 ## Working with Git (Optional)
 
-PA Code works perfectly without Git — you can just connect, edit, and save. But if you want version control and team collaboration, Git adds:
+PA-Code works perfectly without Git — you can just connect, edit, and save. But if you want version control and team collaboration, Git adds:
 
 - **History**: See who changed what and when
 - **Branching**: Work on features without affecting others
@@ -231,7 +231,7 @@ Then create a Merge Request in your Git platform to deploy to the next environme
 
 ## AI Support
 
-PA Code works with any AI coding assistant available in VS Code:
+PA-Code works with any AI coding assistant available in VS Code:
 - **GitHub Copilot** — Code completion and generation for TI/Rules
 - **Other AI providers** — Any VS Code-compatible AI extension
 
@@ -239,18 +239,18 @@ The AI understands TM1 syntax and can help you write processes, debug issues, an
 
 ### Built-in MCP Server (live model context for AI tools)
 
-PA Code ships a built-in, **read-only** [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI agents live context about your connected TM1 model (cubes, dimensions, processes, rules) — 23 tools, `tm1://` resources and ready-made prompts. It runs in-process and reuses your existing authenticated connection.
+PA-Code ships a built-in, **read-only** [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI agents live context about your connected TM1 model (cubes, dimensions, processes, rules) — 23 tools, `tm1://` resources and ready-made prompts. It runs in-process and reuses your existing authenticated connection.
 
-- **GitHub Copilot (Agent mode)** — works out of the box once `PA Code › Mcp Server: Enabled` is on; the TM1 tools appear automatically.
-- **Other AI tools** (Claude Code / Claude Desktop, Codex, Cline, Continue, Cursor, …) — run **`PA Code: Show MCP Endpoint (for external AI tools)`** from the Command Palette to copy a ready-to-use config (HTTP `mcpServers` JSON, a Claude Code CLI command, or a stdio-bridge command for stdio-only clients).
+- **GitHub Copilot (Agent mode)** — works out of the box once `PA-Code › Mcp Server: Enabled` is on; the TM1 tools appear automatically.
+- **Other AI tools** (Claude Code / Claude Desktop, Codex, Cline, Continue, Cursor, …) — run **`PA-Code: Show MCP Endpoint (for external AI tools)`** from the Command Palette to copy a ready-to-use config (HTTP `mcpServers` JSON, a Claude Code CLI command, or a stdio-bridge command for stdio-only clients).
 
-For a stable URL to configure once, set a fixed port via `PA Code › Mcp Server: Port` (e.g. `3900`). The server always binds to `127.0.0.1` only and requires a bearer token on every request.
+For a stable URL to configure once, set a fixed port via `PA-Code › Mcp Server: Port` (e.g. `3900`). The server always binds to `127.0.0.1` only and requires a bearer token on every request.
 
 ---
 
 ## Security & Privacy
 
-PA Code is built for corporate environments:
+PA-Code is built for corporate environments:
 - **Zero telemetry** — No data leaves your machine
 - **Zero credential storage** — Passwords are never saved to disk
 - **Local only** — All communication goes directly from your machine to your TM1 server
@@ -279,16 +279,16 @@ For questions, bug reports, or feature requests, please contact the author or op
 
 ## Contributing
 
-PA Code is an open-source **community project** — contributions are very welcome!
+PA-Code is an open-source **community project** — contributions are very welcome!
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get started (build, test, and the
 lightweight **DCO** sign-off we use instead of a CLA).
 
 ## License
 
-PA Code is licensed under the **[Apache License 2.0](LICENSE)** — a permissive,
+PA-Code is licensed under the **[Apache License 2.0](LICENSE)** — a permissive,
 enterprise-friendly license that includes an explicit patent grant. This means
 you (and your company) can freely use, review, and build on the extension; see
 [LICENSE](LICENSE) and [NOTICE](NOTICE) for details.
 
-Copyright 2026 Tim Geilen and the PA Code contributors.
+Copyright 2026 Tim Geilen and the PA-Code contributors.
 

@@ -1,12 +1,12 @@
-# Contributing to PA Code
+# Contributing to PA-Code
 
-Thanks for your interest in improving PA Code! This is a community project and
+Thanks for your interest in improving PA-Code! This is a community project and
 contributions of all kinds are welcome — bug reports, fixes, features, docs and
 tests.
 
 ## License of contributions
 
-PA Code is licensed under the **Apache License 2.0**. By contributing, you agree
+PA-Code is licensed under the **Apache License 2.0**. By contributing, you agree
 that your contributions are licensed under the same license (Apache-2.0, see
 [LICENSE](LICENSE)), as stated in section 5 of the license.
 
@@ -57,5 +57,5 @@ Please do **not** open public issues for security vulnerabilities. See
 
 ## Code of conduct
 
-Be respectful and constructive. We want PA Code to be a welcoming project for
+Be respectful and constructive. We want PA-Code to be a welcoming project for
 everyone.

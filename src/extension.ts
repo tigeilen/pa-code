@@ -79,7 +79,7 @@ function resolveSyncTarget(filePath: string): { kind: SyncKind; instanceId: stri
 // Admin Server and database endpoint were used, and classifies failures.
 let _connChannel: vscode.OutputChannel | undefined;
 function connLog(msg: string): void {
-    if (!_connChannel) _connChannel = vscode.window.createOutputChannel('PA Code (Connection)');
+    if (!_connChannel) _connChannel = vscode.window.createOutputChannel('PA-Code (Connection)');
     _connChannel.appendLine(`[${new Date().toISOString()}] ${msg}`);
 }
 
@@ -270,7 +270,7 @@ export function activate(context: vscode.ExtensionContext) {
                 if (ok === 'Regenerate') {
                     await mcpServer.regenerateToken();
                     mcpDidChange.fire(); // refresh the token handed to the Copilot agent
-                    vscode.window.showInformationMessage('MCP token regenerated. Re-run "PA Code: Show MCP Endpoint" to copy the new configuration.');
+                    vscode.window.showInformationMessage('MCP token regenerated. Re-run "PA-Code: Show MCP Endpoint" to copy the new configuration.');
                 }
                 break;
             }
@@ -354,7 +354,7 @@ export function activate(context: vscode.ExtensionContext) {
         autoPushStatus.text = on ? '$(cloud) TM1: Auto-Push On' : '$(cloud-offline) TM1: Auto-Push Off';
         autoPushStatus.tooltip = on
             ? 'TM1 changes are pushed to the server on save. Click to switch to manual publish.'
-            : 'TM1 changes are NOT pushed on save. Run "PA Code: Publish Changed Files" to push. Click to re-enable auto-push.';
+            : 'TM1 changes are NOT pushed on save. Run "PA-Code: Publish Changed Files" to push. Click to re-enable auto-push.';
         autoPushStatus.show();
     }
     updateAutoPushStatus();
@@ -365,7 +365,7 @@ export function activate(context: vscode.ExtensionContext) {
         updateAutoPushStatus();
         vscode.window.showInformationMessage(!cur
             ? 'TM1 auto-push on save is ON — saving a .ti/.rux pushes it to the server.'
-            : 'TM1 auto-push on save is OFF — edits stay local until you run "PA Code: Publish Changed Files".');
+            : 'TM1 auto-push on save is OFF — edits stay local until you run "PA-Code: Publish Changed Files".');
     });
     context.subscriptions.push(autoPushStatus, toggleAutoPushCmd,
         vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('pa-code.autoPushOnSave')) updateAutoPushStatus(); }));
@@ -1179,11 +1179,11 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // --- LOCAL .ti DELETE WATCHER ---
-    // When a process file is deleted locally (e.g. in the Explorer), offer to
-    // delete the matching process on the server too. Deletions we trigger
-    // ourselves (deleteProcess / rename) are suppressed. Bulk deletes (e.g. a Git
-    // branch switch) are batched into one prompt and default to keeping the
-    // server objects, so nothing is removed without an explicit confirmation.
+    // Optionally offer to delete a process on the server when its local file is
+    // deleted. OFF by default: a Git branch switch "deletes" files that only
+    // exist in another branch, which produced false prompts — so this is opt-in
+    // via `pa-code.deleteOnServerWhenLocalDeleted`. Our own deletes/renames are
+    // suppressed; bulk deletes are batched into one prompt.
     const pendingDeletes = new Map<string, { instanceId: string; name: string; fsPath: string }>();
     let deleteBatchTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -1234,6 +1234,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     const tiDeleteWatcher = vscode.workspace.createFileSystemWatcher('**/*.ti');
     tiDeleteWatcher.onDidDelete(uri => {
+        // Off by default — never prompt on Git branch switches unless opted in.
+        if (!vscode.workspace.getConfiguration('pa-code').get<boolean>('deleteOnServerWhenLocalDeleted', false)) return;
         const fsPath = uri.fsPath;
         if (suppressDeleteWatch.has(fsPath)) { suppressDeleteWatch.delete(fsPath); return; }
         const target = resolveSyncTarget(fsPath);
@@ -1515,7 +1517,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         if (!TM1Service.getInstance().isConnected(instanceName)) {
-            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA Code Explorer first!`);
+            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA-Code Explorer first!`);
             return;
         }
 
@@ -2308,7 +2310,7 @@ export function activate(context: vscode.ExtensionContext) {
         const instanceId = `${envConfig.name}_${serverRealName}`;
 
         if (!TM1Service.getInstance().isConnected(instanceId)) {
-            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA Code Explorer first!`);
+            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA-Code Explorer first!`);
             return;
         }
 
@@ -2594,7 +2596,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         if (!TM1Service.getInstance().isConnected(instanceName)) {
-            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA Code Explorer first!`);
+            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA-Code Explorer first!`);
             return;
         }
 
@@ -2897,6 +2899,44 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`Added "${item.label}" to Favorites`);
     });
 
+    // Copy the name of an object — from the right-clicked tab (editor/title/context
+    // passes that tab's URI, so it works on a tab that isn't the active one), a tree
+    // item, or the active webview tab (Cube Viewer / Subset Editor) with decorations
+    // like "Cube: ", "Subset Editor — " and a trailing "(instance)" stripped.
+    const copyObjectNameCmd = vscode.commands.registerCommand('pa-code.copyObjectName', async (arg?: any) => {
+        const cleanLabel = (label: string) => label
+            .replace(/^Cube:\s*/i, '')
+            .replace(/^View:\s*/i, '')
+            .replace(/^Subset Editor\s*[—-]\s*/i, '')
+            .replace(/\s*\([^()]*\)\s*$/, '')
+            .replace(/\.(ti|rux)$/i, '')
+            .trim();
+        let name = '';
+        // 1) The tab the user right-clicked (its resource URI).
+        if (arg instanceof vscode.Uri) {
+            const ext = path.extname(arg.path);
+            name = (ext === '.ti' || ext === '.rux') ? path.basename(arg.path, ext) : path.basename(arg.path).replace(/\.(ti|rux)$/i, '');
+        }
+        // 2) A tree item.
+        if (!name && arg && (arg.cubeName || typeof arg.label === 'string')) {
+            name = (typeof arg.label === 'string' ? arg.label : '') || arg.cubeName || '';
+        }
+        // 3) Fallbacks: the active editor, then the active tab label.
+        if (!name) {
+            const ed = vscode.window.activeTextEditor;
+            if (ed) {
+                const ext = path.extname(ed.document.uri.path);
+                if (ext === '.ti' || ext === '.rux') name = path.basename(ed.document.uri.path, ext);
+            }
+        }
+        if (!name) {
+            name = cleanLabel(vscode.window.tabGroups.activeTabGroup?.activeTab?.label || '');
+        }
+        if (!name) { vscode.window.showWarningMessage('No object name to copy.'); return; }
+        await vscode.env.clipboard.writeText(name);
+        vscode.window.showInformationMessage(`Copied "${name}" to clipboard.`);
+    });
+
     const addFavoriteFromEditorCmd = vscode.commands.registerCommand('pa-code.addFavoriteFromEditor', () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) return;
@@ -2955,7 +2995,7 @@ export function activate(context: vscode.ExtensionContext) {
         const serverRealName = instanceName.substring(environmentName.length + 1);
 
         if (!TM1Service.getInstance().isConnected(instanceName)) {
-            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA Code Explorer first!`);
+            vscode.window.showWarningMessage(`Please connect to ${serverRealName} via PA-Code Explorer first!`);
             return;
         }
 
@@ -3059,7 +3099,7 @@ export function activate(context: vscode.ExtensionContext) {
     }, 1200000);
 
     // WICHTIG: disconnectCmd zu subscriptions hinzufügen
-    context.subscriptions.push(connectCmd, disconnectCmd, refreshCmd, createProcessCmd, openProcessCmd, deleteProcessCmd, renameProcessCmd, copyProcessCmd, publishChangedFilesCmd, pullAllCmd, saveListener, searchCmd, clearSearchCmd, folderSearchCmd, clearFolderSearchCmd, openRuleCmd, createRuleCmd, checkRuleSyntaxCmd, executeProcessCmd, executeProcessByLensCmd, settingsCmd, viewLogCmd, showProxyLogCmd, whatsNewCmd, clearOAuthCredentialsCmd, pushToTM1Cmd, codeLensDisposable, tm1LineStatusBar, gotoTM1LineCmd, jumpHighlightDecoration, jumpToLineCmd, formatterDisposable, completionDisposable, functionSnippetDisposable, hoverDisposable, debugFactoryDisposable, debugConfigDisposable, debugProcessByLensCmd, manageConfigCmd, viewThreadsCmd, viewTIConsoleCmd, shortcutTIConsoleCmd, impersonateUserCmd, stopImpersonatingCmd, fileManagerCmd, insertFunctionCmd, searchFunctionsCmd, clearFunctionSearchCmd, deploymentCmd, instanceHubCmd, shortcutSearchCmd, shortcutCreateProcessCmd, shortcutPullAllCmd, shortcutServerLogCmd, shortcutThreadViewerCmd, shortcutDeploymentCmd, securityPanelCmd, addFavoriteCmd, addFavoriteFromEditorCmd, removeFavoriteCmd, clearRecentItemsCmd, executeWithLastParamsCmd, bulkDeleteCmd, mdxWizardCmd, subsetEditorCmd, processLineageCmd, ruleLineageCmd, openCubeViewCmd, openCubeViewerCmd, choreManagerCmd, processPropertiesCmd, tm1DiagnosticCollection, tiDeleteWatcher, { dispose: () => clearInterval(sessionCheckTimer) });
+    context.subscriptions.push(connectCmd, disconnectCmd, refreshCmd, createProcessCmd, openProcessCmd, deleteProcessCmd, renameProcessCmd, copyProcessCmd, publishChangedFilesCmd, pullAllCmd, saveListener, searchCmd, clearSearchCmd, folderSearchCmd, clearFolderSearchCmd, openRuleCmd, createRuleCmd, checkRuleSyntaxCmd, executeProcessCmd, executeProcessByLensCmd, settingsCmd, viewLogCmd, showProxyLogCmd, whatsNewCmd, clearOAuthCredentialsCmd, pushToTM1Cmd, codeLensDisposable, tm1LineStatusBar, gotoTM1LineCmd, jumpHighlightDecoration, jumpToLineCmd, formatterDisposable, completionDisposable, functionSnippetDisposable, hoverDisposable, debugFactoryDisposable, debugConfigDisposable, debugProcessByLensCmd, manageConfigCmd, viewThreadsCmd, viewTIConsoleCmd, shortcutTIConsoleCmd, impersonateUserCmd, stopImpersonatingCmd, fileManagerCmd, insertFunctionCmd, searchFunctionsCmd, clearFunctionSearchCmd, deploymentCmd, instanceHubCmd, shortcutSearchCmd, shortcutCreateProcessCmd, shortcutPullAllCmd, shortcutServerLogCmd, shortcutThreadViewerCmd, shortcutDeploymentCmd, securityPanelCmd, addFavoriteCmd, copyObjectNameCmd, addFavoriteFromEditorCmd, removeFavoriteCmd, clearRecentItemsCmd, executeWithLastParamsCmd, bulkDeleteCmd, mdxWizardCmd, subsetEditorCmd, processLineageCmd, ruleLineageCmd, openCubeViewCmd, openCubeViewerCmd, choreManagerCmd, processPropertiesCmd, tm1DiagnosticCollection, tiDeleteWatcher, { dispose: () => clearInterval(sessionCheckTimer) });
 }
 
 export function deactivate() { }

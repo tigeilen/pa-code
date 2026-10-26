@@ -102,6 +102,12 @@ export class SubsetEditorPanel {
                         this._post('subsets', { subsets: subsets.map(s => s.Name) });
                         break;
                     }
+                    case 'copyText': {
+                        // Webviews can't write the clipboard reliably — the host does it.
+                        await vscode.env.clipboard.writeText(String(msg.text || ''));
+                        vscode.window.showInformationMessage(msg.label || 'Copied to clipboard.');
+                        break;
+                    }
                     default: {
                         // Embedded MDX Builder (Subset Builder) data/generate commands.
                         const reply = await handleMdxBuilderBackend(this._instanceName, msg);
@@ -422,6 +428,7 @@ ${mdxBuilderStyles()}
                 <button class="icon-btn" id="availFilterBtn" title="Filter">▽</button>
                 <button class="icon-btn" id="expandAllBtn" title="Expand all">⊞</button>
                 <button class="icon-btn" id="collapseAllBtn" title="Collapse all">⊟</button>
+                <button class="icon-btn" id="availCopyBtn" title="Copy selected (or all visible) members to clipboard">⧉</button>
             </div>
             <div class="list-wrap" id="availWrap">
                 <div class="list-inner" id="availInner"></div>
@@ -450,6 +457,7 @@ ${mdxBuilderStyles()}
                 <button class="icon-btn" id="setUpBtn" title="Move up">▲</button>
                 <button class="icon-btn" id="setDownBtn" title="Move down">▼</button>
                 <button class="icon-btn" id="setSortBtn" title="Sort ascending">↕</button>
+                <button class="icon-btn" id="setCopyBtn" title="Copy selected (or all) members to clipboard">⧉</button>
             </div>
             <div class="list-wrap" id="setWrap">
                 <div class="list-inner" id="setInner"></div>
@@ -1542,6 +1550,18 @@ function init() {
         rebuildSetFlat();
     });
 
+    // Copy members to the clipboard (via the host — webviews can't do it reliably).
+    function copyNames(names) {
+        if (!names || !names.length) { setStatus('No members to copy.'); return; }
+        post('copyText', { text: names.join('\\n'), label: names.length + ' member(s) copied to clipboard.' });
+    }
+    document.getElementById('availCopyBtn').addEventListener('click', () => {
+        copyNames(state.availSelected.size ? [...state.availSelected] : state.availFlat.map(n => n.name));
+    });
+    document.getElementById('setCopyBtn').addEventListener('click', () => {
+        copyNames(state.setSelected.size ? state.setMembers.filter(n => state.setSelected.has(n)) : state.setMembers.slice());
+    });
+
     // Filter flyout
     const flyout = document.getElementById('filterFlyout');
     document.getElementById('availFilterBtn').addEventListener('click', e => {
@@ -1562,7 +1582,7 @@ function init() {
     document.getElementById('mdxDockClose').addEventListener('click', () => closeMdxDock());
     document.getElementById('mdxFormatBtn').addEventListener('click', () => { const t = document.getElementById('mdxText'); t.value = formatMDX(t.value); histRecord(); });
     document.getElementById('mdxMinifyBtn').addEventListener('click', () => { const t = document.getElementById('mdxText'); t.value = minifyMDX(t.value); histRecord(); });
-    document.getElementById('mdxCopyBtn').addEventListener('click', () => post('copyMDX', { mdx: document.getElementById('mdxText').value }));
+    document.getElementById('mdxCopyBtn').addEventListener('click', () => post('copyText', { text: document.getElementById('mdxText').value, label: 'MDX copied to clipboard.' }));
     document.getElementById('mdxUndoBtn').addEventListener('click', () => undoMdx());
     document.getElementById('mdxRedoBtn').addEventListener('click', () => redoMdx());
     document.getElementById('mdxBuildToggle').addEventListener('click', () => toggleBuild());
