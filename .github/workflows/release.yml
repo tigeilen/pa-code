@@ -12,6 +12,8 @@ jobs:
   release:
     name: Build, package & publish release
     runs-on: ubuntu-latest
+    env:
+      OVSX_TOKEN: ${{ secrets.OVSX_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,7 +57,5 @@ jobs:
           fail_on_unmatched_files: true
 
       - name: Publish to Open VSX
-        if: ${{ secrets.OVSX_TOKEN != '' }}
-        env:
-          OVSX_TOKEN: ${{ secrets.OVSX_TOKEN }}
+        if: ${{ env.OVSX_TOKEN != '' }}
         run: npx --yes ovsx publish "pa-code-${{ steps.version.outputs.version }}.vsix" -p "$OVSX_TOKEN"
