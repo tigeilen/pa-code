@@ -2746,8 +2746,9 @@ export function activate(context: vscode.ExtensionContext) {
         functionRefProvider.clearFilter();
     });
 
-    const deploymentCmd = vscode.commands.registerCommand('pa-code.deploymentAssistant', () => {
-        DeploymentPanel.render();
+    const deploymentCmd = vscode.commands.registerCommand('pa-code.deploymentAssistant', (item?: TM1TreeItem | string) => {
+        const preselectSource = typeof item === 'string' ? item : item?.instanceName;
+        DeploymentPanel.render(preselectSource);
     });
 
     // --- COMMAND: INSTANCE HUB ---
@@ -2790,8 +2791,9 @@ export function activate(context: vscode.ExtensionContext) {
         if (resolved) vscode.commands.executeCommand('pa-code.tiConsole', resolved);
     });
     const shortcutDeploymentCmd = vscode.commands.registerCommand('pa-code.shortcutDeployment', async () => {
-        await resolveInstance(); // just check there's a connection
-        vscode.commands.executeCommand('pa-code.deploymentAssistant');
+        const resolved = await resolveInstance();
+        if (!resolved) return;
+        vscode.commands.executeCommand('pa-code.deploymentAssistant', resolved.instanceName);
     });
 
     const impersonateUserCmd = vscode.commands.registerCommand('pa-code.impersonateUser', async (item?: TM1TreeItem) => {

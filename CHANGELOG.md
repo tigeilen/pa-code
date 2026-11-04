@@ -4,6 +4,12 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.6] - 2026-11-04
+
+### Fixes
+- **Blank lines around `#SECTION` markers are no longer stripped on push.** Saving a process trimmed each section, so empty lines directly before or after the section keywords (`#SECTION Prolog` etc.) were silently removed on the server — and the comparison didn't flag the change. The parser now removes only the structural separators PA-Code itself inserts and preserves your own blank lines across the round-trip. (#7)
+- **Deployment Assistant: the instance you pick now takes effect.** Launching the assistant from the quick-access bar with two or more connected instances showed a picker whose selection had no effect — the Source and Destination stayed empty. The selected instance is now prefilled as the deployment **Source**. (#8)
+
 ## [3.8.5] - 2026-10-21
 
 ### Added

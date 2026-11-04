@@ -38,8 +38,15 @@ export class ProcessParser {
         
         let match;
         while ((match = sectionRegex.exec(content)) !== null) {
-            const sectionName = match[1].toLowerCase(); 
-            const sectionContent = match[2].trim(); 
+            const sectionName = match[1].toLowerCase();
+            // Strip ONLY the structural wrapper that buildProcessFileContent inserts
+            // (one newline after the "#SECTION X" header, and the single blank-line
+            // separator before the next section/#JSON_PROPERTIES). Any further blank
+            // lines are the user's own code and must survive the round-trip to the
+            // server — see issue #7. Using .trim() here erased them.
+            const sectionContent = match[2]
+                .replace(/^\r?\n/, '')
+                .replace(/\r?\n\r?\n$/, '');
 
             if (sectionName === 'prolog') code.Prolog = sectionContent;
             else if (sectionName === 'metadata') code.Metadata = sectionContent;

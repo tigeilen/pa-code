@@ -8,9 +8,11 @@ export class DeploymentPanel {
     public static currentPanel: DeploymentPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
+    private _preselectSource?: string;
 
-    private constructor(panel: vscode.WebviewPanel) {
+    private constructor(panel: vscode.WebviewPanel, preselectSource?: string) {
         this._panel = panel;
+        this._preselectSource = preselectSource;
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.webview.html = this._getWebviewContent();
 
@@ -44,7 +46,7 @@ export class DeploymentPanel {
         }, null, this._disposables);
     }
 
-    public static render() {
+    public static render(preselectSource?: string) {
         if (DeploymentPanel.currentPanel) {
             DeploymentPanel.currentPanel._panel.reveal(vscode.ViewColumn.One);
             return;
@@ -53,14 +55,14 @@ export class DeploymentPanel {
             'tm1Deployment', 'TM1 Deployment Assistant', vscode.ViewColumn.One,
             { enableScripts: true, retainContextWhenHidden: true }
         );
-        DeploymentPanel.currentPanel = new DeploymentPanel(panel);
+        DeploymentPanel.currentPanel = new DeploymentPanel(panel, preselectSource);
     }
 
     private async _sendInit() {
         const config = ConfigManager.getConfig();
         const environments = (config.environments || []).map((e: any) => e.name);
         const connectedInstances = TM1Service.getInstance().getConnectedInstanceNames();
-        this._panel.webview.postMessage({ command: 'init', environments, connectedInstances });
+        this._panel.webview.postMessage({ command: 'init', environments, connectedInstances, preselectSource: this._preselectSource });
     }
 
     private async _loadObjects(instanceName: string, objectType: string) {
@@ -684,6 +686,11 @@ window.addEventListener('message', event => {
         case 'init':
             connectedInstances = msg.connectedInstances || [];
             populateInstanceDropdowns(connectedInstances);
+            if (msg.preselectSource && connectedInstances.includes(msg.preselectSource)) {
+                const s = document.getElementById('sourceInstance');
+                s.value = msg.preselectSource;
+                onInstanceChange();
+            }
             if (document.getElementById('sourceInstance').value && document.getElementById('targetInstance').value) loadBothTypes();
             break;
         case 'objectList':
