@@ -57,8 +57,8 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
      * OAuth (PA SaaS) environments list every database the signed-in account can
      * reach, one instance node per database. Before sign-in there is a single
      * "Sign in" node; a stored refresh token restores the list silently.
-     * With a fixed Database in the settings the environment keeps its single
-     * node named after the environment (same instance id and local folder as before).
+     * With a fixed Database in the settings the environment shows only that
+     * database, without sign-in; it is named after the database all the same.
      */
     private async getOAuthDatabaseItems(env: TM1EnvironmentConfig): Promise<TM1TreeItem[]> {
         const tm1 = TM1Service.getInstance();
@@ -89,8 +89,9 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
             return item;
         };
 
-        if ((env.oauthDatabase || '').trim()) {
-            return [makeNode(env.name, `${env.name}_${env.name}`, true)];
+        const fixedDatabase = (env.oauthDatabase || '').trim();
+        if (fixedDatabase) {
+            return [makeNode(fixedDatabase, `${env.name}_${fixedDatabase}`, true)];
         }
 
         const sessions = OAuthSessionManager.getInstance();

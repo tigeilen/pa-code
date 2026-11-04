@@ -3154,7 +3154,7 @@ async function connectViaOAuth(
 
     await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: `Connecting to ${(envConfig.oauthDatabase || '').trim() || database} (${environmentName}) via OAuth…`,
+        title: `Connecting to ${database} (${environmentName}) via OAuth…`,
         cancellable: false
     }, async (progress) => {
         try {
@@ -3162,8 +3162,12 @@ async function connectViaOAuth(
 
             const fixedDatabase = (envConfig.oauthDatabase || '').trim();
             if (fixedDatabase) {
-                // Single-database setup: the node keeps the environment name, the database comes from the settings
-                database = fixedDatabase;
+                // The tree shows a fixed database without listing; a node left over from an earlier setting is stale
+                if (database !== fixedDatabase) {
+                    processProvider.refresh();
+                    vscode.window.showErrorMessage(`${environmentName} is set to database '${fixedDatabase}', not '${database}'.`);
+                    return;
+                }
             } else {
                 // The node may come from an older tree or a recent item: make sure the database exists
                 const databases = sessions.getDatabases(environmentName) || await sessions.signIn(envConfig, progress);
