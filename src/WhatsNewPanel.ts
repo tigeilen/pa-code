@@ -523,6 +523,44 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
             </div>
         </section>
 
+        <!-- SLIDE 10 (headline: 3.8.7) -->
+        <section class="slide">
+            <div class="wrap">
+                <div class="hero">
+                    <span class="pill">VERSION 3.8.7 · HEADLINE</span>
+                    <h1>🚀 Deploy your whole model — not just processes &amp; rules</h1>
+                    <p>The Deployment Assistant now transports every TM1 object type, optionally copies cube data, and lets you save reusable deployment packages — plus multi-database PA SaaS (OAuth) sign-in with automatic token renewal.</p>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">📦</span> Deployment Assistant for every object type <span class="emoji">✨</span></h2>
+                    <p class="sub">Dimensions, cubes, views, subsets and applications — alongside TI processes and rules</p>
+                    <ul>
+                        <li><strong>Pick any mix in one session</strong> — each object type has its own pill with a live count.</li>
+                        <li><strong>Dimensions</strong> carry their full structure (hierarchies, elements, edges) <strong>plus element attributes and their values</strong>; an existing dimension is updated <strong>additively</strong> (only what's missing is added).</li>
+                        <li><strong>Cubes</strong> deploy their structure and rule, with an <strong>optional "copy cube data"</strong> toggle that bulk-writes the stored input (leaf) cells to the target. Consolidated and rule-calculated cells are skipped by design — the cube's own rule reproduces them on the target.</li>
+                        <li><strong>Views</strong> are deployed <strong>self-contained</strong> — every axis subset is inlined, so they never fail on the target with "subset not found". <strong>Subsets</strong> and <strong>applications</strong> (folders, documents, links) transport too.</li>
+                    </ul>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">🗂️</span> Deployment packages</h2>
+                    <p class="sub">Save a named set of objects and re-deploy it anytime</p>
+                    <ul>
+                        <li><strong>Save, reload, export and re-deploy</strong> a named package (stored in <code>.pa-code/deployment-packages.json</code>) with <strong>per-object notes</strong> and a timestamped <strong>deployment history</strong>.</li>
+                        <li>The package bar is <strong>optional and collapsed by default</strong>, so quick one-off deployments stay simple.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2><span class="emoji">🔐</span> PA SaaS (OAuth): one node per database &amp; token renewal</h2>
+                    <p class="sub">Community contribution by <strong>@svartz</strong> — thank you! · OAuth environments only</p>
+                    <ul>
+                        <li><strong>One tree node per database</strong>: a blank Database field lists every database of the tenant after a single <strong>Sign in</strong>; a stored refresh token restores the list silently after a restart.</li>
+                        <li><strong>Database-based naming</strong> for the tree node and the local sync folder, so code from two databases can't land in one folder.</li>
+                        <li><strong>Automatic token renewal</strong> ~5 minutes before expiry while connected, plus a silent 401-retry — so a lapsed PA SaaS session recovers transparently.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
     </div>
 </div>
 <div class="hint">Use ‹ / › or your arrow keys to browse between versions · Reopen anytime via <code>PA-Code: What's New</code></div>

@@ -4,6 +4,11 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.8] - 2026-11-12
+
+### Added
+- **What's New page for the 3.8.7 feature release.** The 3.8.7 release (the big Deployment Assistant expansion — every object type, optional cube-data copy and reusable deployment packages — plus the PA SaaS OAuth multi-database and token-renewal work) shipped without its **What's New** slide. This release adds that highlight page so the new capabilities are surfaced on update. Reopen it anytime via **PA-Code: What's New**. No functional changes beyond the 3.8.7 feature set.
+
 ## [3.8.7] - 2026-11-12
 
 ### Deployment Assistant — deploy every object type (#10)
