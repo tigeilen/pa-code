@@ -2358,9 +2358,12 @@ export class TM1Service {
         if (options.mdx && options.mdx.trim().length > 0) {
             body.Expression = options.mdx;
         } else {
+            // @odata.bind values must be RAW (quotes doubled, no percent-encoding).
+            const dimRaw = dimensionName.replace(/'/g, "''");
+            const hierRaw = hierarchyName.replace(/'/g, "''");
             const elems = options.elements || [];
             body['Elements@odata.bind'] = elems.map(e =>
-                `Dimensions('${dimEnc}')/Hierarchies('${hierEnc}')/Elements('${encodeURIComponent(e).replace(/'/g, "''")}')`);
+                `Dimensions('${dimRaw}')/Hierarchies('${hierRaw}')/Elements('${String(e).replace(/'/g, "''")}')`);
         }
 
         try {
@@ -2923,6 +2926,589 @@ export class TM1Service {
                 }).catch(() => { });
             }
         }
+    }
+
+    // --- DEPLOYMENT: DIMENSIONS & CUBE DATA (issue #10) ---
+
+    /**
+     * Reads a dimension's full structure for deployment: each hierarchy's
+     * elements (with type), consolidation edges and element-attribute
+     * definitions, plus the attribute values (read in bulk from the
+     * `}ElementAttributes_<dim>` control cube). The auto-managed `Leaves`
+     * hierarchy is skipped.
+     */
+    public async getDimensionForDeploy(instanceName: string, dimensionName: string): Promise<{
+        name: string;
+        hierarchies: {
+            name: string;
+            elements: { name: string; type: string }[];
+            edges: { parent: string; child: string; weight: number }[];
+            attributes: { name: string; type: string }[];
+        }[];
+        attributeValues: { element: string; attribute: string; value: string | number }[];
+    }> {
+        const cfg = this.getConfig(instanceName);
+        const dimEnc = encodeURIComponent(dimensionName).replace(/'/g, "''");
+        const url = `${cfg.url}/api/v1/Dimensions('${dimEnc}')?$expand=Hierarchies($expand=Elements($select=Name,Type),Edges($select=ParentName,ComponentName,Weight),ElementAttributes($select=Name,Type))`;
+        let data: any;
+        try {
+            const resp = await axios.get(url, { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 120000 });
+            this.updateCookieFromResponse(instanceName, resp);
+            data = resp.data;
+        } catch (error: any) {
+            throw new Error(`Failed to read dimension '${dimensionName}': ${error.response?.data?.error?.message || error.message}`);
+        }
+        const hierarchies: any[] = [];
+        for (const h of (data.Hierarchies || [])) {
+            if (String(h.Name).toLowerCase() === 'leaves') { continue; }
+            const elements = (h.Elements || []).map((e: any) => ({ name: e.Name, type: this.normElemType(String(e.Type)) }));
+            const edges = (h.Edges || []).map((e: any) => ({ parent: e.ParentName, child: e.ComponentName, weight: e.Weight == null ? 1 : e.Weight }));
+            const attributes = (h.ElementAttributes || []).map((a: any) => ({ name: a.Name, type: String(a.Type) }));
+            hierarchies.push({ name: h.Name, elements, edges, attributes });
+        }
+        // Read attribute values in bulk from the control cube (reliable + fast).
+        const attributeValues = await this._readAttributeValues(instanceName, dimensionName);
+        return { name: data.Name || dimensionName, hierarchies, attributeValues };
+    }
+
+    /** Reads all element attribute values of a dimension from its `}ElementAttributes_<dim>` control cube. */
+    private async _readAttributeValues(instanceName: string, dimensionName: string): Promise<{ element: string; attribute: string; value: string | number }[]> {
+        const attrCube = '}ElementAttributes_' + dimensionName;
+        let cells: { tuple: { dimension: string; hierarchy: string; element: string }[]; value: string | number }[] = [];
+        try { cells = (await this.readCubeCells(instanceName, attrCube, { leavesOnly: false })).cells; } catch { return []; }
+        const out: { element: string; attribute: string; value: string | number }[] = [];
+        for (const c of cells) {
+            // One tuple member is the dimension's element, the other the attribute.
+            const elemM = c.tuple.find(t => t.dimension?.toLowerCase() === dimensionName.toLowerCase());
+            const attrM = c.tuple.find(t => t.dimension?.toLowerCase() === attrCube.toLowerCase());
+            if (elemM && attrM) { out.push({ element: elemM.element, attribute: attrM.element, value: c.value }); }
+        }
+        return out;
+    }
+
+    /** Creates an element attribute on a hierarchy (idempotent — caller ignores "already exists"). */
+    public async addElementAttribute(instanceName: string, dimensionName: string, hierarchyName: string, attributeName: string, attributeType: string): Promise<void> {
+        const cfg = this.getConfig(instanceName);
+        const dimEnc = encodeURIComponent(dimensionName).replace(/'/g, "''");
+        const hierEnc = encodeURIComponent(hierarchyName || dimensionName).replace(/'/g, "''");
+        const type = /^a/i.test(attributeType) ? 'Alias' : /^n/i.test(attributeType) ? 'Numeric' : 'String';
+        const resp = await axios.post(`${cfg.url}/api/v1/Dimensions('${dimEnc}')/Hierarchies('${hierEnc}')/ElementAttributes`,
+            { Name: attributeName, Type: type },
+            { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 30000 });
+        this.updateCookieFromResponse(instanceName, resp);
+    }
+
+    /**
+     * Deploys a dimension additively. A brand-new dimension is created in a
+     * single POST with all hierarchies/elements/edges inline (fast). An existing
+     * dimension is updated by adding only the elements/edges it doesn't have yet
+     * (so a re-deploy is quick and never fails on "already exists"). Element
+     * attributes and their values are applied additively. Nothing is removed.
+     */
+    public async deployDimension(instanceName: string, def: {
+        name: string;
+        hierarchies: { name: string; elements: { name: string; type: string }[]; edges: { parent: string; child: string; weight: number }[]; attributes: { name: string; type: string }[] }[];
+        attributeValues?: { element: string; attribute: string; value: string | number }[];
+    }): Promise<void> {
+        const cfg = this.getConfig(instanceName);
+        const dimEncQ = encodeURIComponent(def.name).replace(/'/g, "''");
+
+        // Fresh existence check (the cached getDimensionNames can be stale right
+        // after a create in the same deploy batch).
+        let dimExists = false;
+        try {
+            const chk = await axios.get(`${cfg.url}/api/v1/Dimensions('${dimEncQ}')?$select=Name`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 15000, validateStatus: s => s === 200 || s === 404 });
+            dimExists = chk.status === 200;
+        } catch { dimExists = false; }
+
+        if (!dimExists) {
+            // One-shot create: POST the dimension with every hierarchy's elements
+            // and edges inline — one request instead of thousands.
+            const body = {
+                Name: def.name,
+                Hierarchies: def.hierarchies.map(h => ({
+                    Name: h.name,
+                    Elements: h.elements.map(e => ({ Name: e.name, Type: this.normElemType(e.type) })),
+                    Edges: h.edges.map(e => ({ ParentName: e.parent, ComponentName: e.child, Weight: e.weight == null ? 1 : e.weight }))
+                }))
+            };
+            try {
+                const resp = await axios.post(`${cfg.url}/api/v1/Dimensions`, body,
+                    { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 120000 });
+                this.updateCookieFromResponse(instanceName, resp);
+                this.dimensionCache.delete(instanceName);
+            } catch (error: any) {
+                // Fall back to per-hierarchy upsert if the bulk create is rejected.
+                if (error.response?.status !== 409) {
+                    throw new Error(`Failed to create dimension '${def.name}': ${error.response?.data?.error?.message || error.message}`);
+                }
+                dimExists = true;
+            }
+        }
+
+        for (const h of def.hierarchies) {
+            if (dimExists) {
+                try { await this.createHierarchy(instanceName, def.name, h.name); } catch { /* hierarchy already exists */ }
+                // Add only what the target is missing (fast re-deploy, no "exists" errors).
+                const current = await this._getHierarchyElementsEdges(instanceName, def.name, h.name);
+                const haveEl = new Set(current.elements.map(e => e.toLowerCase()));
+                const missingEl = h.elements.filter(e => !haveEl.has(e.name.toLowerCase()));
+                if (missingEl.length) { try { await this.addElements(instanceName, def.name, h.name, missingEl); } catch { /* ignore */ } }
+                const haveEdge = new Set(current.edges.map(e => (e.parent + '\u0000' + e.child).toLowerCase()));
+                const missingEdge = h.edges.filter(e => !haveEdge.has((e.parent + '\u0000' + e.child).toLowerCase()));
+                if (missingEdge.length) { try { await this.addEdges(instanceName, def.name, h.name, missingEdge); } catch { /* ignore */ } }
+            }
+            for (const a of h.attributes) {
+                try { await this.addElementAttribute(instanceName, def.name, h.name, a.name, a.type); } catch { /* attribute already exists */ }
+            }
+        }
+
+        // Write all attribute values in one bulk pass via the control cube
+        // (}ElementAttributes_<dim>), which now exists because the definitions
+        // above were created.
+        const attrValues = def.attributeValues || [];
+        if (attrValues.length) {
+            const attrCube = '}ElementAttributes_' + def.name;
+            const cells = attrValues.map(av => ({
+                tuple: [
+                    { dimension: def.name, hierarchy: def.name, element: av.element },
+                    { dimension: attrCube, hierarchy: attrCube, element: av.attribute }
+                ],
+                value: av.value
+            }));
+            try { await this.writeCellsBulk(instanceName, attrCube, cells); } catch { /* best-effort */ }
+        }
+    }
+
+    /** Reads a target hierarchy's current element names and edges (for additive updates). */
+    private async _getHierarchyElementsEdges(instanceName: string, dimensionName: string, hierarchyName: string): Promise<{ elements: string[]; edges: { parent: string; child: string }[] }> {
+        const cfg = this.getConfig(instanceName);
+        const dimEnc = encodeURIComponent(dimensionName).replace(/'/g, "''");
+        const hierEnc = encodeURIComponent(hierarchyName || dimensionName).replace(/'/g, "''");
+        try {
+            const resp = await axios.get(`${cfg.url}/api/v1/Dimensions('${dimEnc}')/Hierarchies('${hierEnc}')?$expand=Elements($select=Name),Edges($select=ParentName,ComponentName)`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 120000 });
+            this.updateCookieFromResponse(instanceName, resp);
+            const d = resp.data;
+            return {
+                elements: (d.Elements || []).map((e: any) => e.Name),
+                edges: (d.Edges || []).map((e: any) => ({ parent: e.ParentName, child: e.ComponentName }))
+            };
+        } catch { return { elements: [], edges: [] }; }
+    }
+
+    /** Creates a cube over the given dimensions if it doesn't exist yet. Returns true if created. */
+    public async deployCubeStructure(instanceName: string, cubeName: string, dimensions: string[]): Promise<boolean> {
+        const existing = await this.getCubes(instanceName, 'all');
+        const exists = existing.some(c => c.Name.toLowerCase() === cubeName.toLowerCase());
+        if (!exists) { await this.createCube(instanceName, cubeName, dimensions); return true; }
+        return false;
+    }
+
+    /**
+     * Reads a cube's populated cells into explicit tuples. By default only leaf,
+     * writeable, non rule-derived cells are returned (for data copy). Pass
+     * `leavesOnly:false` to include every element (used for the element-attribute
+     * control cube, whose values live on all elements).
+     */
+    public async readCubeCells(instanceName: string, cubeName: string, opts?: { leavesOnly?: boolean }): Promise<{ cells: { tuple: { dimension: string; hierarchy: string; element: string }[]; value: string | number }[]; stats: { total: number; written: number; skippedCons: number; skippedRule: number; skippedEmpty: number } }> {
+        const leavesOnly = opts?.leavesOnly !== false;
+        const empty = { cells: [] as any[], stats: { total: 0, written: 0, skippedCons: 0, skippedRule: 0, skippedEmpty: 0 } };
+        let dims: string[] = [];
+        try { dims = await this.getCubeDimensionNames(instanceName, cubeName); } catch { return empty; }
+        if (!dims.length) { return empty; }
+        const setFor = (d: string) => `{TM1SUBSETALL([${d}])}`;
+        const colSet = setFor(dims[0]);
+        let mdx: string;
+        if (dims.length > 1) {
+            let rowSet = setFor(dims[1]);
+            for (let i = 2; i < dims.length; i++) { rowSet = `CROSSJOIN(${rowSet},${setFor(dims[i])})`; }
+            mdx = `SELECT NON EMPTY ${colSet} ON COLUMNS, NON EMPTY ${rowSet} ON ROWS FROM [${cubeName}]`;
+        } else {
+            mdx = `SELECT NON EMPTY ${colSet} ON COLUMNS FROM [${cubeName}]`;
+        }
+        const cellset = await this.executeMDXCube(instanceName, mdx);
+        const axes = cellset.Axes || [];
+        const colTuples = axes[0]?.Tuples || [];
+        const rowTuples = axes[1]?.Tuples || [];
+        const colHiers = axes[0]?.Hierarchies || [];
+        const rowHiers = axes[1]?.Hierarchies || [];
+        const card0 = colTuples.length || 1;
+        const cells = cellset.Cells || [];
+        // Reliably identify consolidated elements by fetching each axis
+        // hierarchy's real element types — the cellset member Type/Level and the
+        // cell Consolidated flag can't be trusted across TM1 versions, and even a
+        // single consolidated element fails the whole bulk write
+        // (CubeCellWriteStatusElementIsConsolidated).
+        const consByKey: Record<string, Set<string>> = {};
+        if (leavesOnly) {
+            const hiers = [...colHiers, ...rowHiers];
+            for (const h of hiers) {
+                const dim = h?.Dimension?.Name || h?.Name;
+                const hier = h?.Name || dim;
+                const key = (dim + '|' + hier).toLowerCase();
+                if (!dim || consByKey[key]) { continue; }
+                const typeMap = await this.getElementTypeMap(instanceName, dim, hier);
+                const set = new Set<string>();
+                for (const [n, t] of Object.entries(typeMap)) { if (Number(t) === 3) { set.add(String(n).toLowerCase()); } }
+                consByKey[key] = set;
+            }
+        }
+        const isConsMember = (dim: string, hier: string, el: string) => {
+            const set = consByKey[(dim + '|' + hier).toLowerCase()];
+            return set ? set.has(String(el).toLowerCase()) : false;
+        };
+        const isTrue = (x: any) => x === true || x === 'true' || x === 1;
+        const out: { tuple: { dimension: string; hierarchy: string; element: string }[]; value: string | number }[] = [];
+        const stats = { total: cells.length, written: 0, skippedCons: 0, skippedRule: 0, skippedEmpty: 0 };
+        for (let o = 0; o < cells.length; o++) {
+            const c = cells[o];
+            const v = c.Value;
+            if (v === null || v === undefined || v === '') { stats.skippedEmpty++; continue; }
+            if (isTrue(c.RuleDerived)) { stats.skippedRule++; continue; }
+            const colIdx = o % card0;
+            const rowIdx = Math.floor(o / card0);
+            const tuple: { dimension: string; hierarchy: string; element: string }[] = [];
+            let consolidated = false;
+            const ct = colTuples[colIdx]?.Members || [];
+            for (let h = 0; h < ct.length; h++) {
+                const dim = colHiers[h]?.Dimension?.Name || colHiers[h]?.Name;
+                const hier = colHiers[h]?.Name;
+                if (leavesOnly && isConsMember(dim, hier, ct[h].Name)) { consolidated = true; }
+                tuple.push({ dimension: dim, hierarchy: hier, element: ct[h].Name });
+            }
+            if (dims.length > 1) {
+                const rt = rowTuples[rowIdx]?.Members || [];
+                for (let h = 0; h < rt.length; h++) {
+                    const dim = rowHiers[h]?.Dimension?.Name || rowHiers[h]?.Name;
+                    const hier = rowHiers[h]?.Name;
+                    if (leavesOnly && isConsMember(dim, hier, rt[h].Name)) { consolidated = true; }
+                    tuple.push({ dimension: dim, hierarchy: hier, element: rt[h].Name });
+                }
+            }
+            if (consolidated) { stats.skippedCons++; continue; }
+            out.push({ tuple, value: v });
+        }
+        stats.written = out.length;
+        return { cells: out, stats };
+    }
+
+    /**
+     * Writes many cells in bulk via the cellset-PATCH API (tm1py's approach):
+     * one ExecuteMDX creates a cellset over the explicit tuples, then a single
+     * PATCH sets all values. Chunked to keep each request reasonable. Far faster
+     * than one request per cell.
+     */
+    public async writeCellsBulk(instanceName: string, cubeName: string, cells: { tuple: { dimension: string; hierarchy: string; element: string }[]; value: string | number }[]): Promise<{ written: number; failed: number; error?: string }> {
+        if (!cells.length) { return { written: 0, failed: 0 }; }
+        const cfg = this.getConfig(instanceName);
+        const esc = (s: string) => String(s).replace(/\]/g, ']]'); // MDX bracket escape
+        const CHUNK = 5000;
+        let written = 0, failed = 0;
+        let firstError = '';
+        for (let start = 0; start < cells.length; start += CHUNK) {
+            const chunk = cells.slice(start, start + CHUNK);
+            const tuples = chunk.map(c => '(' + c.tuple.map(t => `[${esc(t.dimension)}].[${esc(t.hierarchy)}].[${esc(t.element)}]`).join(',') + ')').join(',');
+            const mdx = `SELECT {${tuples}} ON 0 FROM [${esc(cubeName)}]`;
+            let cellsetId: string | undefined;
+            let stage = 'ExecuteMDX';
+            try {
+                const cr = await axios.post(`${cfg.url}/api/v1/ExecuteMDX`, { MDX: mdx },
+                    { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 180000 });
+                this.updateCookieFromResponse(instanceName, cr);
+                cellsetId = cr.data.ID;
+                stage = 'PATCH';
+                const updates = chunk.map((c, i) => ({ Ordinal: i, Value: c.value }));
+                await axios.patch(`${cfg.url}/api/v1/Cellsets('${cellsetId}')/Cells`, updates,
+                    { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 180000 });
+                written += chunk.length;
+            } catch (err: any) {
+                failed += chunk.length;
+                if (!firstError) { firstError = `${stage}: ${err.response?.data?.error?.message || err.message}`; }
+            } finally {
+                if (cellsetId) {
+                    axios.delete(`${cfg.url}/api/v1/Cellsets('${cellsetId}')`,
+                        { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 15000 }).catch(() => { });
+                }
+            }
+        }
+        return { written, failed, error: firstError };
+    }
+
+    /**
+     * Copies a cube's populated leaf data from one connected instance to another
+     * in bulk (read once, write in large cellset batches).
+     */
+    public async copyCubeData(sourceInstance: string, targetInstance: string, cubeName: string): Promise<{ written: number; skipped: number; failed: number; detail: string }> {
+        const { cells, stats } = await this.readCubeCells(sourceInstance, cubeName, { leavesOnly: true });
+        if (!cells.length) {
+            let detail: string;
+            if (stats.skippedRule > 0 && stats.skippedRule >= (stats.total - stats.skippedCons - stats.skippedEmpty)) {
+                detail = `no stored input values — all ${stats.skippedRule} populated leaf cell(s) are rule-calculated, which the cube rule reproduces on the target (nothing to copy)`;
+            } else {
+                detail = `no writable input cells (of ${stats.total}: ${stats.skippedRule} rule-calculated, ${stats.skippedCons} consolidated, ${stats.skippedEmpty} empty)`;
+            }
+            return { written: 0, skipped: stats.total, failed: 0, detail };
+        }
+        const res = await this.writeCellsBulk(targetInstance, cubeName, cells);
+        return { written: res.written, skipped: 0, failed: res.failed, detail: res.failed ? `${cells.length} read, write failed — ${res.error || 'unknown error'}` : `${cells.length} writable cell(s) found` };
+    }
+
+    // --- DEPLOYMENT: VIEWS & SUBSETS (issue #10, phase 2) ---
+
+    /** Lists all public views as "Cube : View" strings via a single expanded query. */
+    public async getAllViewsForDeploy(instanceName: string): Promise<string[]> {
+        const cfg = this.getConfig(instanceName);
+        try {
+            const resp = await axios.get(`${cfg.url}/api/v1/Cubes?$select=Name&$expand=Views($select=Name)`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 60000 });
+            this.updateCookieFromResponse(instanceName, resp);
+            const out: string[] = [];
+            for (const c of (resp.data.value || [])) {
+                for (const v of (c.Views || [])) { out.push(`${c.Name} : ${v.Name}`); }
+            }
+            return out.sort((a, b) => a.localeCompare(b));
+        } catch (error: any) {
+            throw new Error(`Failed to list views: ${error.response?.data?.error?.message || error.message}`);
+        }
+    }
+
+    /** Lists all public subsets as "Dimension : Subset" strings (hierarchy == dimension) via one query. */
+    public async getAllSubsetsForDeploy(instanceName: string): Promise<string[]> {
+        const cfg = this.getConfig(instanceName);
+        try {
+            const resp = await axios.get(`${cfg.url}/api/v1/Dimensions?$select=Name&$expand=Hierarchies($select=Name;$expand=Subsets($select=Name))`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 60000 });
+            this.updateCookieFromResponse(instanceName, resp);
+            const out: string[] = [];
+            for (const d of (resp.data.value || [])) {
+                for (const h of (d.Hierarchies || [])) {
+                    if (String(h.Name).toLowerCase() !== String(d.Name).toLowerCase()) { continue; }
+                    for (const s of (h.Subsets || [])) { out.push(`${d.Name} : ${s.Name}`); }
+                }
+            }
+            return out.sort((a, b) => a.localeCompare(b));
+        } catch (error: any) {
+            throw new Error(`Failed to list subsets: ${error.response?.data?.error?.message || error.message}`);
+        }
+    }
+
+    /**
+     * Reads a view and returns a POST-ready body for the target. MDX views are
+     * trivial; native views are reconstructed with their axis/title subset binds
+     * (named subsets by reference, anonymous subsets inline).
+     */
+    public async getViewForDeploy(instanceName: string, cubeName: string, viewName: string): Promise<{ isMdx: boolean; body: any }> {
+        const cfg = this.getConfig(instanceName);
+        const enc = (s: string) => encodeURIComponent(s).replace(/'/g, "''");
+        // Columns/Rows/Titles are complex-type properties on the NativeView
+        // derived type, so nested navigation must use the type-cast path syntax
+        // (tm1.NativeView/Columns/Subset) — NOT Columns($expand=Subset), which
+        // TM1 rejects with "Expecting '/' after property of complex type".
+        const subOpts = `$select=Name,Alias,Expression;$expand=Hierarchy($select=Name;$expand=Dimension($select=Name)),Elements($select=Name)`;
+        const expand = `$expand=tm1.NativeView/Columns/Subset(${subOpts}),` +
+            `tm1.NativeView/Rows/Subset(${subOpts}),` +
+            `tm1.NativeView/Titles/Subset(${subOpts}),` +
+            `tm1.NativeView/Titles/Selected($select=Name)`;
+        let data: any;
+        try {
+            const resp = await axios.get(`${cfg.url}/api/v1/Cubes('${enc(cubeName)}')/Views('${enc(viewName)}')?${expand}`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 60000 });
+            this.updateCookieFromResponse(instanceName, resp);
+            data = resp.data;
+        } catch (error: any) {
+            throw new Error(`Failed to read view '${viewName}': ${error.response?.data?.error?.message || error.message}`);
+        }
+        const odataType = String(data['@odata.type'] || '');
+        if (/MDXView/i.test(odataType) || (data.MDX && !data.Columns)) {
+            return { isMdx: true, body: { '@odata.type': 'ibm.tm1.api.v1.MDXView', Name: viewName, MDX: data.MDX } };
+        }
+        // @odata.bind values are JSON strings parsed by TM1 as OData paths — the
+        // names must be RAW (only single quotes doubled). Percent-encoding here
+        // makes TM1 look for e.g. a subset literally named 'All%20Members'.
+        const bind = (s: string) => String(s).replace(/'/g, "''");
+        const hierUrl = (dim: string, hier: string) => `Dimensions('${bind(dim)}')/Hierarchies('${bind(hier)}')`;
+        const elemUrl = (dim: string, hier: string, el: string) => `${hierUrl(dim, hier)}/Elements('${bind(el)}')`;
+        // Inline every axis subset as an anonymous subset (its expression for
+        // dynamic, its elements for static) instead of referencing a named
+        // subset. This makes the deployed view self-contained — it no longer
+        // fails when a named subset it points to isn't present on the target
+        // (only the dimensions/elements it uses need to exist).
+        const buildSelection = (sel: any) => {
+            const sub = sel.Subset || {};
+            const hier = sub.Hierarchy || {};
+            const dimName = hier.Dimension?.Name || hier.Name || '';
+            const hierName = hier.Name || dimName;
+            const anon: any = { 'Hierarchy@odata.bind': hierUrl(dimName, hierName) };
+            if (sub.Alias) { anon.Alias = sub.Alias; }
+            if (sub.Expression) { anon.Expression = sub.Expression; }
+            else { anon['Elements@odata.bind'] = (sub.Elements || []).map((e: any) => elemUrl(dimName, hierName, e.Name)); }
+            const out: any = { Subset: anon };
+            return { out, dimName, hierName };
+        };
+        const columns = (data.Columns || []).map((c: any) => buildSelection(c).out);
+        const rows = (data.Rows || []).map((r: any) => buildSelection(r).out);
+        const titles = (data.Titles || []).map((t: any) => {
+            const b = buildSelection(t);
+            if (t.Selected?.Name) { b.out['Selected@odata.bind'] = elemUrl(b.dimName, b.hierName, t.Selected.Name); }
+            return b.out;
+        });
+        const body = {
+            '@odata.type': 'ibm.tm1.api.v1.NativeView',
+            Name: viewName,
+            Columns: columns,
+            Rows: rows,
+            Titles: titles,
+            SuppressEmptyColumns: !!data.SuppressEmptyColumns,
+            SuppressEmptyRows: !!data.SuppressEmptyRows,
+            FormatString: data.FormatString || '0.#########'
+        };
+        return { isMdx: false, body };
+    }
+
+    /** Deploys a view: deletes any existing target view of that name, then creates it. */
+    public async deployView(instanceName: string, cubeName: string, viewName: string, body: any): Promise<void> {
+        const cfg = this.getConfig(instanceName);
+        const cubeEnc = encodeURIComponent(cubeName);
+        try {
+            await axios.delete(`${cfg.url}/api/v1/Cubes('${cubeEnc}')/Views('${encodeURIComponent(viewName)}')`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 15000 });
+        } catch { /* view not present on target */ }
+        try {
+            const resp = await axios.post(`${cfg.url}/api/v1/Cubes('${cubeEnc}')/Views`, body,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 30000 });
+            this.updateCookieFromResponse(instanceName, resp);
+        } catch (error: any) {
+            throw new Error(`Failed to create view '${viewName}': ${error.response?.data?.error?.message || error.message}`);
+        }
+    }
+
+    // --- DEPLOYMENT: APPLICATIONS (issue #10, phase 3) ---
+
+    /** Extracts the short type name from an application entry's @odata.type (e.g. "CubeReference", "Folder"). */
+    private _appType(odataType: string): string {
+        return String(odataType || '').replace(/^#/, '').split('.').pop() || '';
+    }
+
+    /** Recursively lists the public Applications tree as "Folder/Sub/Name" path strings. */
+    public async getAllApplicationsForDeploy(instanceName: string): Promise<string[]> {
+        const cfg = this.getConfig(instanceName);
+        const encSeg = (s: string) => encodeURIComponent(s).replace(/'/g, "''");
+        const out: string[] = [];
+        const walk = async (urlBase: string, prefix: string): Promise<void> => {
+            let data: any;
+            try {
+                const resp = await axios.get(`${cfg.url}/api/v1/${urlBase}/Contents?$select=Name`,
+                    { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 60000 });
+                data = resp.data;
+            } catch { return; }
+            for (const item of (data.value || [])) {
+                const p = prefix ? `${prefix}/${item.Name}` : item.Name;
+                out.push(p);
+                if (this._appType(item['@odata.type']) === 'Folder') {
+                    await walk(`${urlBase}/Contents('${encSeg(item.Name)}')`, p);
+                }
+            }
+        };
+        await walk(`Contents('Applications')`, '');
+        return out.sort((a, b) => a.localeCompare(b));
+    }
+
+    /** Ensures each folder in the path exists in the target Applications tree (idempotent). */
+    private async _ensureAppFolders(instanceName: string, folders: string[]): Promise<void> {
+        const cfg = this.getConfig(instanceName);
+        const encSeg = (s: string) => encodeURIComponent(s).replace(/'/g, "''");
+        let base = `Contents('Applications')`;
+        for (const f of folders) {
+            try {
+                await axios.post(`${cfg.url}/api/v1/${base}/Contents`,
+                    { '@odata.type': 'ibm.tm1.api.v1.Folder', Name: f },
+                    { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 30000 });
+            } catch { /* folder already exists */ }
+            base = `${base}/Contents('${encSeg(f)}')`;
+        }
+    }
+
+    /**
+     * Deploys one application entry (reference, folder, link or document) from a
+     * source to a target instance, recreating any parent folders. Reference
+     * targets (cube, view, dimension, subset, process, chore) must already exist
+     * on the target. The entry name is used verbatim (keeping any v11 suffix).
+     */
+    public async deployApplication(sourceInstance: string, targetInstance: string, appPath: string): Promise<void> {
+        const srcCfg = this.getConfig(sourceInstance);
+        const tgtCfg = this.getConfig(targetInstance);
+        const encSeg = (s: string) => encodeURIComponent(s).replace(/'/g, "''");
+        const segs = appPath.split('/');
+        const name = segs[segs.length - 1];
+        const folders = segs.slice(0, -1);
+        const folderUrl = `Contents('Applications')` + folders.map(f => `/Contents('${encSeg(f)}')`).join('');
+        const itemUrl = `${folderUrl}/Contents('${encSeg(name)}')`;
+        const parentContents = `${folderUrl}/Contents`;
+
+        let meta: any;
+        try {
+            const r = await axios.get(`${srcCfg.url}/api/v1/${itemUrl}`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(sourceInstance), timeout: 30000 });
+            meta = r.data;
+        } catch (e: any) {
+            throw new Error(`Failed to read application '${appPath}': ${e.response?.data?.error?.message || e.message}`);
+        }
+        const type = this._appType(meta['@odata.type']);
+
+        await this._ensureAppFolders(targetInstance, folders);
+        try {
+            await axios.delete(`${tgtCfg.url}/api/v1/${itemUrl}`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(targetInstance), timeout: 15000 });
+        } catch { /* not present on target */ }
+
+        const post = async (body: any) => {
+            await axios.post(`${tgtCfg.url}/api/v1/${parentContents}`, body,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(targetInstance), timeout: 30000 });
+        };
+
+        if (type === 'Folder') { await post({ '@odata.type': 'ibm.tm1.api.v1.Folder', Name: name }); return; }
+
+        if (type === 'Document') {
+            const contentResp = await axios.get(`${srcCfg.url}/api/v1/${itemUrl}/Document/Content`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(sourceInstance), timeout: 120000, responseType: 'arraybuffer' });
+            await post({ '@odata.type': 'ibm.tm1.api.v1.Document', Name: name });
+            await axios.put(`${tgtCfg.url}/api/v1/${itemUrl}/Document/Content`, Buffer.from(contentResp.data),
+                { httpsAgent: this.httpsAgent, headers: { ...this.getHeaders(targetInstance), 'Content-Type': 'application/octet-stream' }, timeout: 120000 });
+            return;
+        }
+
+        if (type === 'Link') {
+            const r = await axios.get(`${srcCfg.url}/api/v1/${itemUrl}?$expand=*`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(sourceInstance), timeout: 30000 });
+            await post({ '@odata.type': 'ibm.tm1.api.v1.Link', Name: name, URL: r.data.URL });
+            return;
+        }
+
+        const refExpand: Record<string, string> = {
+            CubeReference: 'Cube($select=Name)',
+            ViewReference: 'View($select=Name;$expand=Cube($select=Name))',
+            DimensionReference: 'Dimension($select=Name)',
+            SubsetReference: 'Subset($select=Name;$expand=Hierarchy($select=Name;$expand=Dimension($select=Name)))',
+            ProcessReference: 'Process($select=Name)',
+            ChoreReference: 'Chore($select=Name)'
+        };
+        const ex = refExpand[type];
+        if (!ex) { throw new Error(`Unsupported application type '${type}' for '${appPath}'.`); }
+        const r = await axios.get(`${srcCfg.url}/api/v1/${itemUrl}?$expand=${ex}`,
+            { httpsAgent: this.httpsAgent, headers: this.getHeaders(sourceInstance), timeout: 30000 });
+        const d = r.data;
+        const body: any = { '@odata.type': `ibm.tm1.api.v1.${type}`, Name: name };
+        // @odata.bind values are raw OData paths (quotes doubled, no percent-encoding).
+        const bind = (s: string) => String(s).replace(/'/g, "''");
+        if (type === 'CubeReference') { body['Cube@odata.bind'] = `Cubes('${bind(d.Cube.Name)}')`; }
+        else if (type === 'ViewReference') { body['View@odata.bind'] = `Cubes('${bind(d.View.Cube.Name)}')/Views('${bind(d.View.Name)}')`; }
+        else if (type === 'DimensionReference') { body['Dimension@odata.bind'] = `Dimensions('${bind(d.Dimension.Name)}')`; }
+        else if (type === 'SubsetReference') { const h = d.Subset.Hierarchy; body['Subset@odata.bind'] = `Dimensions('${bind(h.Dimension.Name)}')/Hierarchies('${bind(h.Name)}')/Subsets('${bind(d.Subset.Name)}')`; }
+        else if (type === 'ProcessReference') { body['Process@odata.bind'] = `Processes('${bind(d.Process.Name)}')`; }
+        else if (type === 'ChoreReference') { body['Chore@odata.bind'] = `Chores('${bind(d.Chore.Name)}')`; }
+        await post(body);
     }
 
     // --- V12 TENANT ---
