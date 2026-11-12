@@ -17,7 +17,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 export interface TM1Object { Name: string; }
 export interface TM1ProcessContent { Prolog: string; Metadata: string; Data: string; Epilog: string; PropertiesJSON: string; }
 export interface ProcessSyntaxError { LineNumber: number; Message: string; Procedure: string; }
-interface ConnectionInfo { url: string; authHeader?: string; cookie?: string; connected: boolean; isAdmin?: boolean; extraHeaders?: Record<string, string>; timeout?: number; impersonate?: string; adminCookie?: string; }
+interface ConnectionInfo { url: string; authHeader?: string; cookie?: string; connected: boolean; isAdmin?: boolean; extraHeaders?: Record<string, string>; timeout?: number; impersonate?: string; adminCookie?: string; oauthEnv?: string; }
 
 export class TM1Service {
     private static instance: TM1Service;
@@ -25,6 +25,8 @@ export class TM1Service {
     private connections: Map<string, ConnectionInfo> = new Map();
     private adminHostCache: Map<string, { servers: { Name: string, Port: number, SSL: boolean, Host?: string }[], timestamp: number }> = new Map();
     private httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    private oauthRenewer?: (environmentName: string) => Promise<string>;
+    private oauthRetryInstalled = false;
 
     // IntelliSense caches
     private cubeCache: Map<string, string[]> = new Map();
@@ -3576,7 +3578,7 @@ export class TM1Service {
      * Lists the TM1 servers/databases available through a PAW instance using the
      * OAuth-routed endpoint `GET <pawHost>/api/v1/tm1/Servers`.
      */
-    public async getPawServers(pawHost: string, authHeader: string): Promise<{ Name: string; Status: string }[]> {
+    public async getPawServers(pawHost: string, authHeader: string): Promise<{ Name: string; AcceptingClients: boolean }[]> {
         const host = this.normalizePawHost(pawHost);
         try {
             const response = await axios.get(`${host}/api/v1/tm1/Servers`, {
@@ -3588,7 +3590,7 @@ export class TM1Service {
             const rows = Array.isArray(data) ? data : (data.value || data.databases || data.servers || data.Servers || []);
             return rows.map((x: any) => ({
                 Name: x.Name || x.name || x.ID || x.id || x.ServerName || x.serverName || (typeof x === 'string' ? x : ''),
-                Status: x.Status || x.status || 'Unknown'
+                AcceptingClients: x.AcceptingClients !== false
             })).filter((x: any) => x.Name);
         } catch (error: any) {
             throw new Error(`Failed to list PAW servers: ${error.response?.data?.error?.message || error.response?.status || error.message}`);
@@ -3599,7 +3601,7 @@ export class TM1Service {
      * Connects to a PAW-routed TM1 server using an OAuth bearer header. Validates
      * the token against ActiveUser and stores the connection.
      */
-    public async setConnectionWithOAuth(instanceName: string, restBaseUrl: string, authHeader: string, timeoutMs?: number): Promise<void> {
+    public async setConnectionWithOAuth(instanceName: string, restBaseUrl: string, authHeader: string, timeoutMs?: number, oauthEnv?: string): Promise<void> {
         const reqTimeout = timeoutMs && timeoutMs > 0 ? timeoutMs : 20000;
         let url = restBaseUrl.replace(/\/+$/, '');
         if (url.toLowerCase().endsWith('/api/v1')) {
@@ -3613,7 +3615,7 @@ export class TM1Service {
                 timeout: reqTimeout
             });
             const cookie = this.extractCookie(response);
-            this.connections.set(instanceName, { url, authHeader, cookie, connected: true, extraHeaders, timeout: reqTimeout });
+            this.connections.set(instanceName, { url, authHeader, cookie, connected: true, extraHeaders, timeout: reqTimeout, oauthEnv });
 
             // Detect admin status (optional)
             try {
@@ -3628,6 +3630,52 @@ export class TM1Service {
             const status = error.response?.status ? ` (Status ${error.response.status})` : '';
             throw new Error(`OAuth connection failed${status}: ${error.response?.data?.error?.message || error.message}`);
         }
+    }
+
+    /** True if any connection uses the OAuth session of this environment. */
+    public hasOAuthConnections(environmentName: string): boolean {
+        return Array.from(this.connections.values()).some(c => c.oauthEnv === environmentName);
+    }
+
+    /** Swaps in a refreshed bearer header on every connection of an OAuth environment. */
+    public updateOAuthAuthHeader(environmentName: string, authHeader: string): void {
+        for (const c of this.connections.values()) {
+            if (c.oauthEnv === environmentName) c.authHeader = authHeader;
+        }
+    }
+
+    /**
+     * Fallback for when the renewal timer could not run (e.g. after sleep): a 401
+     * on an OAuth connection forces one token refresh through `renew` (which
+     * returns the new bearer header) and retries the request once. Requests of
+     * other connections are left alone.
+     */
+    public setOAuthRenewer(renew: (environmentName: string) => Promise<string>): void {
+        this.oauthRenewer = renew;
+        if (this.oauthRetryInstalled) return;
+        this.oauthRetryInstalled = true;
+        axios.interceptors.response.use(undefined, async (error) => {
+            const config = error.config;
+            if (error.response?.status !== 401 || !config || config._oauthRetried || !this.oauthRenewer) throw error;
+            const requestUrl = (config.baseURL || '') + (config.url || '');
+            const cfg = Array.from(this.connections.values())
+                .find(c => c.oauthEnv && !c.impersonate && (requestUrl === c.url || requestUrl.startsWith(c.url + '/')));
+            if (!cfg?.oauthEnv) throw error;
+
+            config._oauthRetried = true;
+            const sentHeader = config.headers?.Authorization || config.headers?.authorization;
+            // Another request may already have renewed the token: then just retry with it
+            const authHeader = sentHeader && sentHeader !== cfg.authHeader
+                ? cfg.authHeader!
+                : await this.oauthRenewer(cfg.oauthEnv).catch(() => { throw error; });
+            config.headers.Authorization = authHeader;
+            // The TM1 session behind the old cookie may be gone as well; the bearer opens a new one
+            delete config.headers.Cookie;
+            const response = await axios.request(config);
+            // Keep what the retry worked with, so later requests don't send the stale cookie again
+            cfg.cookie = this.extractCookie(response) || undefined;
+            return response;
+        });
     }
 
     // --- MDX EXECUTION ---

@@ -246,6 +246,11 @@
         "title": "PA-Code: Clear Stored OAuth Credentials"
       },
       {
+        "command": "pa-code.oauthSignIn",
+        "title": "PA Code: Sign In to PA SaaS (OAuth)",
+        "icon": "$(sign-in)"
+      },
+      {
         "command": "pa-code.clearSearch",
         "title": "Clear Search",
         "icon": "$(clear-all)"

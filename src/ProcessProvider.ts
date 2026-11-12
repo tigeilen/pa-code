@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { TM1Service } from './TM1Service';
-import { ConfigManager } from './ConfigManager';
+import { ConfigManager, TM1EnvironmentConfig } from './ConfigManager';
+import { OAuthSessionManager } from './OAuthSessionManager';
 
 export class TM1TreeItem extends vscode.TreeItem {
     constructor(
@@ -50,6 +51,80 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
             return '';
         }
         return connectionType === 'v12Tenant' ? '✦' : '★';
+    }
+
+    /**
+     * OAuth (PA SaaS) environments list every database the signed-in account can
+     * reach, one instance node per database. Before sign-in there is a single
+     * "Sign in" node; a stored refresh token restores the list silently.
+     * With a fixed Database in the settings the environment shows only that
+     * database, without sign-in; it is named after the database all the same.
+     */
+    private async getOAuthDatabaseItems(env: TM1EnvironmentConfig): Promise<TM1TreeItem[]> {
+        const tm1 = TM1Service.getInstance();
+
+        const makeNode = (label: string, instanceId: string, acceptingClients: boolean): TM1TreeItem => {
+            const isConnected = tm1.isConnected(instanceId);
+            const item = new TM1TreeItem(
+                label,
+                vscode.TreeItemCollapsibleState.Collapsed,
+                'instance',
+                env.name,
+                instanceId,
+                isConnected ? 'tm1instance_connected' : 'tm1instance_disconnected'
+            );
+
+            const activeFilter = this.filters.get(instanceId);
+            const badge = this.getAdminBadge(instanceId, env.connectionType);
+            if (activeFilter && isConnected) {
+                item.description = `${badge} (Filtered: ${activeFilter})`.trim();
+                item.contextValue = 'tm1instance_connected_filtered';
+            } else if (badge) {
+                item.description = badge;
+            } else if (!acceptingClients && !isConnected) {
+                item.description = 'not accepting clients';
+            }
+
+            item.iconPath = this.getInstanceIcon(instanceId);
+            return item;
+        };
+
+        const fixedDatabase = (env.oauthDatabase || '').trim();
+        if (fixedDatabase) {
+            return [makeNode(fixedDatabase, `${env.name}_${fixedDatabase}`, true)];
+        }
+
+        const sessions = OAuthSessionManager.getInstance();
+        const databases = sessions.getDatabases(env.name) || await sessions.trySilentSignIn(env);
+
+        if (!databases) {
+            const signIn = new TM1TreeItem(
+                'Sign in to list databases',
+                vscode.TreeItemCollapsibleState.None,
+                'instance',
+                env.name,
+                '',
+                'tm1oauth_signin'
+            );
+            signIn.iconPath = new vscode.ThemeIcon('sign-in');
+            signIn.command = { command: 'pa-code.oauthSignIn', title: 'Sign In', arguments: [env.name] };
+            return [signIn];
+        }
+
+        if (databases.length === 0) {
+            const empty = new TM1TreeItem(
+                '(No databases available for this account)',
+                vscode.TreeItemCollapsibleState.None,
+                'instance',
+                env.name,
+                '',
+                'tm1oauth_empty'
+            );
+            empty.iconPath = new vscode.ThemeIcon('warning');
+            return [empty];
+        }
+
+        return databases.map(db => makeNode(db.Name, `${env.name}_${db.Name}`, db.AcceptingClients));
     }
 
     setFilter(instanceName: string, text: string): void {
@@ -135,6 +210,10 @@ export class ProcessProvider implements vscode.TreeDataProvider<TM1TreeItem> {
                 const config = ConfigManager.getConfig();
                 const env = config.environments.find(e => e.name === element.environmentName);
                 if (!env) return [];
+
+                if (env.authMethod === 'OAuth') {
+                    return await this.getOAuthDatabaseItems(env);
+                }
 
                 if (env.connectionType === 'customUrl') {
                     const instanceName = env.name;

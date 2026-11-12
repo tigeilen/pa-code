@@ -39,7 +39,7 @@ import { ProcessPropertiesPanel } from './ProcessPropertiesPanel';
 import { RecentItemsProvider, FavoritesProvider, QuickActionsProvider, ActivityBarItem } from './ActivityBarProviders';
 import { ProxyHelper } from './ProxyHelper';
 import { WhatsNewPanel } from './WhatsNewPanel';
-import { PawOAuthService } from './PawOAuthService';
+import { OAuthSessionManager } from './OAuthSessionManager';
 import { Tm1McpServer } from './mcp/Tm1McpServer';
 import { TM1FoldingProvider } from './TM1FoldingProvider';
 import { ProcessBaseline, SyncKind } from './ProcessBaseline';
@@ -312,6 +312,7 @@ export function activate(context: vscode.ExtensionContext) {
         TM1Service.showIntegratedLog();
     }));
 
+    context.subscriptions.push(OAuthSessionManager.init(context));
     const processProvider = new ProcessProvider();
 
     // Per-process baseline hashes for server-side change detection on save.
@@ -526,7 +527,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         // --- OAuth (PAW) flow: handled before the classic REST-URL path ---
         if (envConfig.authMethod === 'OAuth') {
-            await connectViaOAuth(context, envConfig, instanceName, serverRealName, environmentName, processProvider, askPullAllAfterConnect);
+            await connectViaOAuth(envConfig, instanceName, serverRealName, environmentName, processProvider, askPullAllAfterConnect);
             return;
         }
 
@@ -2280,8 +2281,36 @@ export function activate(context: vscode.ExtensionContext) {
         if (!pick) return;
         await context.secrets.delete(`pa-code.oauth.secret.${pick}`);
         await context.secrets.delete(`pa-code.oauth.refresh.${pick}`);
-        oauthTokenCache.delete(pick);
+        OAuthSessionManager.getInstance().signOut(pick);
+        processProvider.refresh();
         vscode.window.showInformationMessage(`Cleared stored OAuth credentials for ${pick}. You'll be asked to sign in again on next connect.`);
+    });
+
+    // --- COMMAND: OAUTH SIGN-IN (lists the tenant's databases in the tree) ---
+    let oauthSignInCmd = vscode.commands.registerCommand('pa-code.oauthSignIn', async (environmentName?: string) => {
+        const oauthEnvs = (ConfigManager.getConfig().environments || []).filter((e: any) => e.authMethod === 'OAuth');
+        if (!environmentName) {
+            if (oauthEnvs.length === 0) { vscode.window.showInformationMessage('No OAuth environments are configured.'); return; }
+            environmentName = oauthEnvs.length === 1
+                ? oauthEnvs[0].name
+                : await vscode.window.showQuickPick(oauthEnvs.map((e: any) => e.name), { placeHolder: 'Sign in to which environment?' });
+            if (!environmentName) return;
+        }
+        const envConfig = oauthEnvs.find((e: any) => e.name === environmentName);
+        if (!envConfig) return;
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Signing in to ${environmentName} via OAuth…`,
+            cancellable: false
+        }, async (progress) => {
+            try {
+                const databases = await OAuthSessionManager.getInstance().signIn(envConfig, progress);
+                processProvider.refresh();
+                vscode.window.showInformationMessage(`Signed in to ${environmentName}: ${databases.length} database(s) available.`);
+            } catch (e: any) {
+                vscode.window.showErrorMessage(e.message);
+            }
+        });
     });
 
     // --- COMMAND: PUSH TO TM1 (FROM EXPLORER) ---
@@ -3101,136 +3130,62 @@ export function activate(context: vscode.ExtensionContext) {
     }, 1200000);
 
     // WICHTIG: disconnectCmd zu subscriptions hinzufügen
-    context.subscriptions.push(connectCmd, disconnectCmd, refreshCmd, createProcessCmd, openProcessCmd, deleteProcessCmd, renameProcessCmd, copyProcessCmd, publishChangedFilesCmd, pullAllCmd, saveListener, searchCmd, clearSearchCmd, folderSearchCmd, clearFolderSearchCmd, openRuleCmd, createRuleCmd, checkRuleSyntaxCmd, executeProcessCmd, executeProcessByLensCmd, settingsCmd, viewLogCmd, showProxyLogCmd, whatsNewCmd, clearOAuthCredentialsCmd, pushToTM1Cmd, codeLensDisposable, tm1LineStatusBar, gotoTM1LineCmd, jumpHighlightDecoration, jumpToLineCmd, formatterDisposable, completionDisposable, functionSnippetDisposable, hoverDisposable, debugFactoryDisposable, debugConfigDisposable, debugProcessByLensCmd, manageConfigCmd, viewThreadsCmd, viewTIConsoleCmd, shortcutTIConsoleCmd, impersonateUserCmd, stopImpersonatingCmd, fileManagerCmd, insertFunctionCmd, searchFunctionsCmd, clearFunctionSearchCmd, deploymentCmd, instanceHubCmd, shortcutSearchCmd, shortcutCreateProcessCmd, shortcutPullAllCmd, shortcutServerLogCmd, shortcutThreadViewerCmd, shortcutDeploymentCmd, securityPanelCmd, addFavoriteCmd, copyObjectNameCmd, addFavoriteFromEditorCmd, removeFavoriteCmd, clearRecentItemsCmd, executeWithLastParamsCmd, bulkDeleteCmd, mdxWizardCmd, subsetEditorCmd, processLineageCmd, ruleLineageCmd, openCubeViewCmd, openCubeViewerCmd, choreManagerCmd, processPropertiesCmd, tm1DiagnosticCollection, tiDeleteWatcher, { dispose: () => clearInterval(sessionCheckTimer) });
+    context.subscriptions.push(connectCmd, disconnectCmd, refreshCmd, createProcessCmd, openProcessCmd, deleteProcessCmd, renameProcessCmd, copyProcessCmd, publishChangedFilesCmd, pullAllCmd, saveListener, searchCmd, clearSearchCmd, folderSearchCmd, clearFolderSearchCmd, openRuleCmd, createRuleCmd, checkRuleSyntaxCmd, executeProcessCmd, executeProcessByLensCmd, settingsCmd, viewLogCmd, showProxyLogCmd, whatsNewCmd, clearOAuthCredentialsCmd, oauthSignInCmd, pushToTM1Cmd, codeLensDisposable, tm1LineStatusBar, gotoTM1LineCmd, jumpHighlightDecoration, jumpToLineCmd, formatterDisposable, completionDisposable, functionSnippetDisposable, hoverDisposable, debugFactoryDisposable, debugConfigDisposable, debugProcessByLensCmd, manageConfigCmd, viewThreadsCmd, viewTIConsoleCmd, shortcutTIConsoleCmd, impersonateUserCmd, stopImpersonatingCmd, fileManagerCmd, insertFunctionCmd, searchFunctionsCmd, clearFunctionSearchCmd, deploymentCmd, instanceHubCmd, shortcutSearchCmd, shortcutCreateProcessCmd, shortcutPullAllCmd, shortcutServerLogCmd, shortcutThreadViewerCmd, shortcutDeploymentCmd, securityPanelCmd, addFavoriteCmd, copyObjectNameCmd, addFavoriteFromEditorCmd, removeFavoriteCmd, clearRecentItemsCmd, executeWithLastParamsCmd, bulkDeleteCmd, mdxWizardCmd, subsetEditorCmd, processLineageCmd, ruleLineageCmd, openCubeViewCmd, openCubeViewerCmd, choreManagerCmd, processPropertiesCmd, tm1DiagnosticCollection, tiDeleteWatcher, { dispose: () => clearInterval(sessionCheckTimer) });
 }
 
 export function deactivate() { }
 
-// In-memory OAuth token cache per environment (access token + expiry + refresh token)
-const oauthTokenCache = new Map<string, import('./PawOAuthService').PawOAuthToken>();
-
 /**
- * Obtains a valid PAW OAuth bearer header for an environment, reusing a cached
- * access token, silently refreshing via a stored refresh token, or falling back
- * to a full browser login. Refresh tokens are persisted in SecretStorage so the
- * user can reconnect across restarts without re-authenticating in the browser.
- */
-async function getOAuthBearer(
-    context: vscode.ExtensionContext,
-    environmentName: string,
-    opts: import('./PawOAuthService').PawOAuthOptions,
-    progress?: vscode.Progress<{ message?: string }>
-): Promise<string> {
-    const refreshKey = `pa-code.oauth.refresh.${environmentName}`;
-    const now = Date.now();
-
-    // 1. Valid cached access token?
-    const cached = oauthTokenCache.get(environmentName);
-    if (cached && cached.expiresAt && cached.expiresAt > now + 60000) {
-        return `${cached.tokenType || 'Bearer'} ${cached.accessToken}`;
-    }
-
-    // 2. Try a silent refresh (in-memory or persisted refresh token)
-    const refreshToken = cached?.refreshToken || await context.secrets.get(refreshKey);
-    if (refreshToken) {
-        try {
-            progress?.report({ message: 'Refreshing session…' });
-            const token = await PawOAuthService.refresh(opts, refreshToken);
-            oauthTokenCache.set(environmentName, token);
-            if (token.refreshToken) await context.secrets.store(refreshKey, token.refreshToken);
-            return `${token.tokenType || 'Bearer'} ${token.accessToken}`;
-        } catch {
-            // Refresh failed (expired/revoked) — fall through to interactive login
-        }
-    }
-
-    // 3. Full browser authorization code flow
-    progress?.report({ message: 'Signing in…' });
-    const token = await PawOAuthService.authenticate(opts);
-    oauthTokenCache.set(environmentName, token);
-    if (token.refreshToken) await context.secrets.store(refreshKey, token.refreshToken);
-    return `${token.tokenType || 'Bearer'} ${token.accessToken}`;
-}
-
-/**
- * Connects to a PAW-routed TM1 database using OAuth. Retrieves the client secret
- * from SecretStorage (prompting once if missing), obtains a token (cache /
- * refresh / browser), discovers the target database if not fixed, and stores
- * the connection.
+ * Connects one PAW-routed TM1 database of an OAuth environment. The tree lists
+ * every database of the tenant as its own instance node, so the database is the
+ * node's server name; the environment's OAuth session (one sign-in) is shared by
+ * all of them and renews the token on every connected database.
  */
 async function connectViaOAuth(
-    context: vscode.ExtensionContext,
     envConfig: any,
     instanceName: string,
-    serverRealName: string,
+    database: string,
     environmentName: string,
     processProvider: ProcessProvider,
     askPullAllAfterConnect: (instanceName: string, environmentName: string, serverRealName: string) => void
 ) {
-    const pawUrl = envConfig.oauthPawUrl;
-    const clientId = envConfig.oauthClientId;
-    if (!pawUrl || !clientId) {
-        vscode.window.showErrorMessage('OAuth environment is missing the PAW Base URL or Client ID. Open Settings to configure it.');
-        return;
-    }
-
-    const secretKey = `pa-code.oauth.secret.${environmentName}`;
-    let clientSecret = await context.secrets.get(secretKey);
-    if (!clientSecret) {
-        const entered = await vscode.window.showInputBox({
-            prompt: `OAuth Client Secret for ${environmentName}`,
-            password: true, ignoreFocusOut: true,
-            placeHolder: 'Leave blank if your PAW OAuth client has no secret'
-        });
-        if (entered === undefined) return; // cancelled
-        clientSecret = entered;
-        if (clientSecret) {
-            const save = await vscode.window.showQuickPick(['Yes', 'No'], { placeHolder: 'Save this client secret securely for next time?' });
-            if (save === 'Yes') await context.secrets.store(secretKey, clientSecret);
-        }
-    }
-
     const tm1 = TM1Service.getInstance();
-    const opts = {
-        pawBaseUrl: pawUrl,
-        clientId,
-        clientSecret: clientSecret || undefined,
-        redirectPort: envConfig.oauthRedirectPort || 53173,
-        scope: 'v0userContext'
-    };
+    const sessions = OAuthSessionManager.getInstance();
 
     await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: `Connecting to ${environmentName} via OAuth…`,
+        title: `Connecting to ${database} (${environmentName}) via OAuth…`,
         cancellable: false
     }, async (progress) => {
         try {
-            const authHeader = await getOAuthBearer(context, environmentName, opts, progress);
+            const authHeader = await sessions.getAuthHeader(envConfig, { interactive: true, progress });
 
-            // Determine the target database/server
-            let database = (envConfig.oauthDatabase || '').trim();
-            if (!database) {
-                progress.report({ message: 'Listing databases…' });
-                const servers = await tm1.getPawServers(pawUrl, authHeader);
-                if (servers.length === 0) {
-                    vscode.window.showErrorMessage('No TM1 databases were returned by PAW for this account.');
+            const fixedDatabase = (envConfig.oauthDatabase || '').trim();
+            if (fixedDatabase) {
+                // The tree shows a fixed database without listing; a node left over from an earlier setting is stale
+                if (database !== fixedDatabase) {
+                    processProvider.refresh();
+                    vscode.window.showErrorMessage(`${environmentName} is set to database '${fixedDatabase}', not '${database}'.`);
                     return;
                 }
-                const picked = await vscode.window.showQuickPick(
-                    servers.map(s => ({ label: s.Name, description: s.Status })),
-                    { placeHolder: 'Select a TM1 database/server' }
-                );
-                if (!picked) return;
-                database = picked.label;
+            } else {
+                // The node may come from an older tree or a recent item: make sure the database exists
+                const databases = sessions.getDatabases(environmentName) || await sessions.signIn(envConfig, progress);
+                if (!databases.some(d => d.Name === database)) {
+                    processProvider.refresh();
+                    const names = databases.map(d => d.Name).join(', ') || 'none';
+                    vscode.window.showErrorMessage(`Database '${database}' is not available in ${environmentName}. Available: ${names}.`);
+                    return;
+                }
             }
 
             progress.report({ message: `Connecting to ${database}…` });
-            const restBase = tm1.buildPawTm1Base(pawUrl, database);
-            await tm1.setConnectionWithOAuth(instanceName, restBase, authHeader, envConfig.timeout);
+            const restBase = tm1.buildPawTm1Base(envConfig.oauthPawUrl, database);
+            await tm1.setConnectionWithOAuth(instanceName, restBase, authHeader, envConfig.timeout, environmentName);
 
             vscode.window.showInformationMessage(`Connected to ${database} (${environmentName}) via OAuth.`);
             processProvider.refresh();
-            askPullAllAfterConnect(instanceName, environmentName, serverRealName);
+            askPullAllAfterConnect(instanceName, environmentName, database);
         } catch (e: any) {
             vscode.window.showErrorMessage(e.message);
         }

@@ -470,8 +470,8 @@ export class SettingsPanel {
                 </div>
                 <div class="form-group">
                     <label>TM1 Database / Server (optional)</label>
-                    <input type="text" id="inpOAuthDatabase" placeholder="Leave blank to list available databases on connect">
-                    <div class="hint" style="font-size:11px; opacity:0.7; margin-top:4px;">Leave blank to pick from a list when you connect, or fix one database here.</div>
+                    <input type="text" id="inpOAuthDatabase" placeholder="Leave blank to show all available databases in the tree">
+                    <div class="hint" style="font-size:11px; opacity:0.7; margin-top:4px;">Leave blank to list every database of the tenant in the tree after sign-in, or fix one database here.</div>
                 </div>
             </div>
 
