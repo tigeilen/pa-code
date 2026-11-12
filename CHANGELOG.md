@@ -4,6 +4,23 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.8.7] - 2026-11-12
+
+### Deployment Assistant — deploy every object type (#10)
+- **Beyond processes and rules.** The Deployment Assistant now transports **dimensions**, **cubes**, **views**, **subsets** and **applications** in addition to TI processes and rules. Pick any mix in one session; each type has its own pill with a live count.
+- **Dimensions** carry their full structure (hierarchies, elements, edges) **plus element attributes and attribute values** — a new dimension is created in one shot, an existing one is updated additively (only missing elements/edges/attributes are added), and attribute values are written to the target's control cube.
+- **Cubes** deploy their structure and rule, with an **optional "copy cube data" toggle**: stored input (leaf) cells are read from the source and bulk-written to the target. Consolidated and rule-calculated cells are skipped by design — rule-calculated values are reproduced by the cube's own rule on the target — and the result note explains clearly when a cube has no writable input cells.
+- **Views** are deployed self-contained: every axis subset is **inlined** (as a dynamic expression or an explicit member list), so a view no longer fails on the target with "subset not found". **Subsets** and **applications** (folders, documents, references and links) transport too.
+- **Deployment packages.** Save a named set of objects (with per-object notes) into a **package** stored in `.pa-code/deployment-packages.json`, then reload, export or re-deploy it later. Packages keep a timestamped **deployment history**. The package bar is optional and collapsed by default so simple one-off deployments stay simple.
+
+### PA SaaS (OAuth): one tree node per database, database-based names, token renewal (#9)
+*Contributed by @svartz — thank you!* Applies only to environments with **Auth = OAuth (PAW Authorization Code)**; Basic, CAM, IBM Cloud, API Key and Integrated Login are unchanged.
+- **One tree node per database.** When the Database field is blank, the environment lists every database from the tenant (`GET /api/v1/tm1/Servers`) as its own node. Before you sign in it shows a **Sign in to list databases** node (also available as the command **PA-Code: Sign In to PA SaaS (OAuth)**); a stored refresh token restores the list silently after a restart. Databases not accepting clients are labelled as such. One sign-in lets you connect to several databases at once.
+- **Database-based naming.** The tree label, the connection id, the local sync folder and the connect / "Pull all" prompts all use the **database** name — including when the Database field is filled in. Changing the Database field yields a new node and folder, so code from two databases can't land in one folder; a stale node from an earlier setting is refused on connect.
+- **Token renewal.** A new `OAuthSessionManager` keeps one session per environment and serializes token requests (PA SaaS rotates the refresh token on every refresh). It renews ~5 minutes before expiry while at least one database is connected, and puts the fresh bearer on every connection of that environment. A **401** on an OAuth connection triggers one silent forced refresh and a single retry via a global response interceptor, so a lapsed session recovers transparently; if renewal ultimately fails you get a **Sign In** prompt.
+
+> **Migration note (PA SaaS / OAuth):** OAuth environments now name the tree node and the local sync folder after the TM1 **database** instead of the environment. Existing OAuth users — including single-database setups with the Database field filled in — get a new `<folder>/<database>/Processes` folder on their next pull. The old folder named after the environment is left in place (not moved or deleted). If you already named the environment after its database, you see no change.
+
 ## [3.8.6] - 2026-11-04
 
 ### Fixes
