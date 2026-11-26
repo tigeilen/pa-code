@@ -138,6 +138,19 @@ async function applyTm1ThemeColors(): Promise<void> {
     } catch { /* settings may be read-only in some environments — ignore */ }
 }
 
+/** A local .ti from before VariablesUIData support is rewritten once, even if otherwise identical. */
+function lacksVariablesUIData(filePath: string, serverPropertiesJSON: string): boolean {
+    try {
+        const server = JSON.parse(serverPropertiesJSON || '{}');
+        if (!Array.isArray(server.VariablesUIData) || server.VariablesUIData.length === 0) return false;
+        if (!fs.existsSync(filePath)) return false;
+        const local = JSON.parse(ProcessParser.parseFileContent(fs.readFileSync(filePath, 'utf8')).PropertiesJSON || '{}');
+        return !Object.prototype.hasOwnProperty.call(local, 'VariablesUIData');
+    } catch {
+        return false;
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -981,7 +994,7 @@ export function activate(context: vscode.ExtensionContext) {
             // avoids rewriting a file whose only diff is EOL or TM1's regenerated
             // Variables, which would show a phantom change in Source Control.
             const sameOnDisk = fs.existsSync(filePath) && ProcessBaseline.canonicalProcessHash(ProcessParser.parseFileContent(fs.readFileSync(filePath, 'utf8'))) === serverCanon;
-            if (!sameOnDisk) fs.writeFileSync(filePath, fileContent, 'utf8');
+            if (!sameOnDisk || lacksVariablesUIData(filePath, content.PropertiesJSON)) fs.writeFileSync(filePath, fileContent, 'utf8');
 
             const doc = await vscode.workspace.openTextDocument(filePath);
             // Always open a permanent (non-preview) tab so several processes can stay open.
@@ -1638,7 +1651,7 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                     // Only write NEW files. An existing, canonically-identical file is left
                     // untouched so Pull doesn't dirty Git with an invisible (EOL) diff.
-                    if (!exists) fs.writeFileSync(filePath, fileContent, 'utf8');
+                    if (!exists || lacksVariablesUIData(filePath, proc.Content.PropertiesJSON)) fs.writeFileSync(filePath, fileContent, 'utf8');
                     processBaseline.set('process', instanceName, proc.Name, { s: serverHash, l: localHash });
                 }
 

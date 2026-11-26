@@ -4,6 +4,12 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.9.1] - 2026-11-26
+
+### Fixes
+- **Existing `.ti` files now pick up `VariablesUIData`.** Opening a process or running Pull All left a local file untouched when it matched the server canonically — and that compare ignores `Variables`/`VariablesUIData`, so files created before 3.9.0 never received the new key. A local file that lacks `VariablesUIData` while the server has UI data is now rewritten once on open/pull (processes without UI data, e.g. "No Datasource", stay untouched). Tip: one **Pull All** brings a whole repository up to date in a single commit.
+- **Process Properties: new variables match the existing ones.** A variable added in the panel now has the full shape (`Name`, `Type`, `Position`, `StartByte`, `EndByte`) and a unique name (`vNew`, `vNew2`, … — a duplicate `vNew` was previously dropped on save). The panel also keeps `VariablesUIData` in step: adding inserts an *Other* entry before formula variables, removing deletes the matching entry and renumbers positions, and type changes update `VarType`.
+
 ## [3.9.0] - 2026-11-26
 
 ### Added

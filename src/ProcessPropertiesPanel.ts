@@ -705,16 +705,38 @@ function renderVariables() {
     </tr>\`; }).join('');
 }
 
+// VariablesUIData: entries without VarName=/IgnoredInputVarName= map 1:1 to Variables.
+function uiDataSlots() {
+    const ui = properties.VariablesUIData;
+    if (!Array.isArray(ui) || ui.length === 0) return null;
+    const slots = [];
+    ui.forEach((e, i) => { if (!/(^|\f)(VarName|IgnoredInputVarName)=/.test(String(e))) slots.push(i); });
+    return slots.length === (properties.Variables || []).length ? slots : null;
+}
+
 function addVariable() {
     if (!properties.Variables) properties.Variables = [];
     properties.Variables = collectVariables();
-    properties.Variables.push({ Name: 'vNew', StartByte: 0, EndByte: 0, Type: 'String' });
+    const slots = uiDataSlots();
+    const names = new Set(properties.Variables.map(v => String(v.Name || '').toLowerCase()));
+    let name = 'vNew';
+    for (let n = 2; names.has(name.toLowerCase()); n++) name = 'vNew' + n;
+    properties.Variables.push({ Name: name, Type: 'String', Position: properties.Variables.length + 1, StartByte: 0, EndByte: 0 });
+    if (slots) {
+        const ui = properties.VariablesUIData;
+        let at = slots.length ? slots[slots.length - 1] + 1 : ui.findIndex(e => /(^|\f)VarName=/.test(String(e)));
+        if (at < 0) at = ui.length;
+        ui.splice(at, 0, 'VarType=32\fColType=827\f');
+    }
     renderVariables();
 }
 
 function removeVar(idx) {
     properties.Variables = collectVariables();
+    const slots = uiDataSlots();
     properties.Variables.splice(idx, 1);
+    if (slots) properties.VariablesUIData.splice(slots[idx], 1);
+    properties.Variables.forEach((v, i) => { v.Position = i + 1; });
     renderVariables();
 }
 
@@ -798,10 +820,19 @@ function collectVariables() {
 }
 
 function save() {
+    const variables = collectVariables();
+    properties.Variables = variables;
+    const slots = uiDataSlots();
+    if (slots) {
+        variables.forEach((v, i) => {
+            const code = varTypeLabel(v.Type) === 'Numeric' ? 33 : 32;
+            properties.VariablesUIData[slots[i]] = String(properties.VariablesUIData[slots[i]]).replace(/(^|\f)VarType=\d+/, '$1VarType=' + code);
+        });
+    }
     const result = {
         Parameters: collectParameters(),
         DataSource: collectDsProperties(),
-        Variables: collectVariables(),
+        Variables: variables,
         // Realigned to the edited variables by PA-Code when the process is saved to TM1.
         ...(Array.isArray(properties.VariablesUIData) ? { VariablesUIData: properties.VariablesUIData } : {}),
         HasSecurityAccess: properties.HasSecurityAccess || false
