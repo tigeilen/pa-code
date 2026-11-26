@@ -62,6 +62,14 @@ export class SettingsPanel {
                             this._panel.webview.postMessage({ command: 'oauthSecretStored', envName: message.envName });
                         })();
                         return;
+                    case 'copyOAuthSecret':
+                        (async () => {
+                            const secret = await this._context.secrets.get(`pa-code.oauth.secret.${message.fromEnv}`);
+                            if (secret) {
+                                await this._context.secrets.store(`pa-code.oauth.secret.${message.toEnv}`, secret);
+                            }
+                        })();
+                        return;
                     case 'checkOAuthSecret':
                         (async () => {
                             const key = `pa-code.oauth.secret.${message.envName}`;
@@ -581,6 +589,7 @@ export class SettingsPanel {
                     vscode.postMessage({ command: 'saveConfig', environments: currentEnvironments });
                     break;
                 case 'oauthSecretStatus':
+                    if (cloneSourceName) { break; }
                     if (typeof oauthSecretHint !== 'undefined' && oauthSecretHint) {
                         oauthSecretHint.innerText = message.hasSecret ? '(a secret is stored — leave blank to keep it)' : '(no secret stored yet)';
                     }
@@ -781,6 +790,7 @@ export class SettingsPanel {
         });
 
         document.getElementById('cancelBtn').addEventListener('click', () => {
+            cloneSourceName = '';
             modal.style.display = 'none';
         });
 
@@ -845,6 +855,13 @@ export class SettingsPanel {
                 if (!formData.oauthPawUrl) { missing.push({ el: inpOAuthPawUrl, label: 'PAW Base URL' }); }
                 if (!formData.oauthClientId) { missing.push({ el: inpOAuthClientId, label: 'OAuth Client ID' }); }
             }
+            const currentIdx = parseInt(editIndex.value, 10);
+            if (formData.name && currentEnvironments.some(function(e, i){ return i !== currentIdx && (e.name || '').toLowerCase() === formData.name.toLowerCase(); })) {
+                inpName.classList.add('invalid');
+                inpName.focus();
+                vscode.postMessage({ command: 'showError', message: 'An environment named "' + formData.name + '" already exists. Please choose a different name.' });
+                return;
+            }
             if (missing.length) {
                 missing.forEach(function(m){ if (m.el) { m.el.classList.add('invalid'); } });
                 if (missing[0].el) { missing[0].el.scrollIntoView({ block: 'center' }); missing[0].el.focus(); }
@@ -856,7 +873,10 @@ export class SettingsPanel {
             // Store the client secret securely (never persisted in tm1-project.json)
             if (formData.authMethod === 'OAuth' && inpOAuthClientSecret.value) {
                 vscode.postMessage({ command: 'storeOAuthSecret', envName: formData.name, secret: inpOAuthClientSecret.value });
+            } else if (formData.authMethod === 'OAuth' && cloneSourceName) {
+                vscode.postMessage({ command: 'copyOAuthSecret', fromEnv: cloneSourceName, toEnv: formData.name });
             }
+            cloneSourceName = '';
 
             const idx = parseInt(editIndex.value, 10);
             if (idx >= 0) {
@@ -892,6 +912,7 @@ export class SettingsPanel {
                     <td>\${scopeLabel}</td>
                     <td class="actions-cell">
                         <button class="secondary" onclick="editEnvironment(\${index})">Edit</button>
+                        <button class="secondary" onclick="cloneEnvironment(\${index})" title="Create a copy of this environment, e.g. for another database on the same server">Clone</button>
                         <button class="danger" onclick="deleteEnvironment(\${index})">Delete</button>
                     </td>
                 \`;
@@ -899,8 +920,34 @@ export class SettingsPanel {
             });
         }
 
+        let cloneSourceName = '';
+
+        function uniqueEnvName(base) {
+            const taken = new Set(currentEnvironments.map(function(e){ return (e.name || '').toLowerCase(); }));
+            let candidate = base + ' (copy)';
+            for (let n = 2; taken.has(candidate.toLowerCase()); n++) { candidate = base + ' (copy ' + n + ')'; }
+            return candidate;
+        }
+
+        window.cloneEnvironment = (index) => {
+            const env = currentEnvironments[index];
+            if (!env) { return; }
+            window.editEnvironment(index);
+            modalTitle.textContent = "Clone Environment";
+            editIndex.value = -1;
+            cloneSourceName = env.name || '';
+            inpName.value = uniqueEnvName(env.name || 'Environment');
+            if (env.folder) { inpFolder.value = env.folder + '_copy'; }
+            if (env.authMethod === 'OAuth') {
+                oauthSecretHint.innerText = '(leave blank to reuse the secret of "' + cloneSourceName + '")';
+            }
+            inpName.focus();
+            inpName.select();
+        };
+
         window.editEnvironment = (index) => {
             const env = currentEnvironments[index];
+            cloneSourceName = '';
             modalTitle.textContent = "Edit Environment";
             editIndex.value = index;
             inpName.value = env.name || "";

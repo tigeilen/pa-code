@@ -30,6 +30,9 @@ export class DeploymentPanel {
                 case 'checkObjects':
                     await this._checkObjects(message.sourceInstance, message.targetInstance, message.objects);
                     return;
+                case 'getDependencies':
+                    await this._getDependencies(message.instanceName, message.cubes || [], message.dimensions || []);
+                    return;
                 case 'compare':
                     await this._compareObjects(message.sourceInstance, message.targetInstance, message.objectName, message.objectType);
                     return;
@@ -107,6 +110,20 @@ export class DeploymentPanel {
         } catch (err: any) {
             this._panel.webview.postMessage({ command: 'error', message: `Failed to load objects: ${err.message}` });
         }
+    }
+
+    private async _getDependencies(instanceName: string, cubes: string[], dimensions: string[]) {
+        const tm1 = TM1Service.getInstance();
+        const cubeDeps: { cube: string; dimensions: string[]; hasRules: boolean }[] = [];
+        const errors: string[] = [];
+        for (const cube of cubes) {
+            try {
+                cubeDeps.push({ cube, ...(await tm1.getCubeDependencies(instanceName, cube)) });
+            } catch (err: any) {
+                errors.push(err.message);
+            }
+        }
+        this._panel.webview.postMessage({ command: 'dependencies', cubes: cubeDeps, dimensions, errors });
     }
 
     /**
@@ -331,10 +348,10 @@ export class DeploymentPanel {
             const sp = JSON.parse(srcCode?.PropertiesJSON || '{}');
             const tp = JSON.parse(targetCode?.PropertiesJSON || '{}');
             if (sp.DataSource && typeof sp.DataSource === 'object') {
-                const tpw = tp.DataSource ? (tp.DataSource.dataSourcePassword ?? tp.DataSource.DatasourcePassword) : undefined;
-                delete sp.DataSource.DatasourcePassword; delete sp.DataSource.Password; delete sp.DataSource.password;
-                if (tpw !== undefined && tpw !== '') { sp.DataSource.dataSourcePassword = tpw; }
-                else { delete sp.DataSource.dataSourcePassword; todo.push(name); }
+                const tpw = tp.DataSource ? (tp.DataSource.password ?? tp.DataSource.Password ?? tp.DataSource.dataSourcePassword ?? tp.DataSource.DatasourcePassword) : undefined;
+                delete sp.DataSource.DatasourcePassword; delete sp.DataSource.dataSourcePassword; delete sp.DataSource.Password;
+                if (tpw !== undefined && tpw !== '') { sp.DataSource.password = tpw; }
+                else { delete sp.DataSource.password; todo.push(name); }
             }
             return { ...srcCode, PropertiesJSON: JSON.stringify(sp) };
         } catch { return srcCode; }
@@ -412,13 +429,13 @@ export class DeploymentPanel {
                             // transported. Keep the TARGET's existing password (its own blob
                             // round-trips on its own server) instead of pushing the source's.
                             const deployCode = hasDs ? DeploymentPanel._withTargetPassword(srcCode, previousCode, obj.name, passwordTodo) : srcCode;
-                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, deployCode);
+                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, deployCode, { exactVariablesUIData: true });
                         } else {
                             await TM1Service.getInstance().createProcess(targetInstance, obj.name);
                             // New target: the source password can't be decrypted here — strip it
                             // so we don't write a broken one; the user sets it on the target.
                             const deployCode = hasDs ? DeploymentPanel._withoutPassword(srcCode, obj.name, passwordTodo) : srcCode;
-                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, deployCode);
+                            await TM1Service.getInstance().updateProcessCode(targetInstance, obj.name, deployCode, { exactVariablesUIData: true });
                         }
                         results.push({ name: obj.name, type: 'process', action: obj.exists ? 'updated' : 'created', success: true, previousCode, newCode: srcCode });
                     } else {
@@ -919,6 +936,7 @@ export class DeploymentPanel {
         <button class="btn" type="button" style="font-size:12px;" onclick="toggleBrowse()" id="btnBrowse">&#9776; Browse / Select Multiple</button>
         <button class="btn" type="button" style="font-size:12px;" onclick="togglePasteBox()" id="btnPaste">&#128203; Paste List</button>
         <button class="btn" type="button" style="font-size:12px;" onclick="loadFromLog()">&#128193; Load from Log</button>
+        <button class="btn" type="button" style="font-size:12px;" onclick="suggestDependenciesForSelection()" title="Suggest rules, dimensions, views and subsets used by the selected cubes and dimensions">&#128279; Add Dependencies&hellip;</button>
         <button class="btn" type="button" style="font-size:12px;" onclick="clearSelected()">Clear List</button>
     </div>
     <div id="cubeDataRow" style="display:none; margin-top:10px; align-items:center; gap:8px; font-size:12px;" title="Only applies to Cube objects. On: populated leaf cells are copied to the target in bulk (fast — one batched write, not cell by cell). Off: only the empty cube structure is created.">
@@ -944,6 +962,23 @@ export class DeploymentPanel {
             <button class="btn" type="button" onclick="clearPasteBox()">Clear</button>
         </div>
         <div id="pasteResult" style="margin-top:6px;"></div>
+    </div>
+    <div id="depBox" style="display:none; margin-top:8px; border:1px solid var(--vscode-panel-border); border-radius:6px; padding:8px;">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+            <strong style="font-size:12px;">Dependencies on the source</strong>
+            <span style="font-size:11px; color:var(--vscode-descriptionForeground);">Rules and dimensions are pre-selected; pick the views and subsets you need.</span>
+            <span style="margin-left:auto; display:flex; gap:6px;">
+                <button class="btn" type="button" style="font-size:11px;" onclick="depSelectAll(true)">Select All</button>
+                <button class="btn" type="button" style="font-size:11px;" onclick="depSelectAll(false)">None</button>
+            </span>
+        </div>
+        <input type="text" id="depFilter" placeholder="Search dependencies (e.g. view or subset name)..." oninput="filterDependencies()" style="width:100%; box-sizing:border-box; margin-bottom:6px; padding:6px 8px; border-radius:6px; border:1px solid var(--vscode-input-border); background:var(--vscode-input-background); color:var(--vscode-input-foreground);" />
+        <div id="depList" style="max-height:300px; overflow-y:auto; border:1px solid var(--vscode-panel-border); border-radius:6px; padding:4px;"></div>
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-primary" type="button" id="depAddBtn" onclick="addDependencies()">Add Selected</button>
+            <button class="btn" type="button" onclick="closeDependencies()">Skip</button>
+            <span id="depCount" style="margin-left:auto; font-size:11px; color:var(--vscode-descriptionForeground);"></span>
+        </div>
     </div>
     <div class="tags" id="selectedTags"></div>
     <div style="margin-top: 12px;">
@@ -1045,6 +1080,9 @@ window.addEventListener('message', event => {
             renderReview();
             document.getElementById('step3').classList.remove('step-disabled');
             break;
+        case 'dependencies':
+            applyDependencies(msg);
+            break;
         case 'deployResults':
             renderResults(msg.results);
             break;
@@ -1112,6 +1150,7 @@ function onInstanceChange() {
     }
     document.getElementById('step3').classList.add('step-disabled');
     selectedObjects = [];
+    closeDependencies();
     checkResults = [];
     objectsByType = { process: [], rule: [], dimension: [], cube: [], view: [], subset: [], application: [] };
     activePackageId = '';
@@ -1237,6 +1276,8 @@ function addObject(name) {
     document.getElementById('step3').classList.add('step-disabled');
     checkResults = [];
     renderTags();
+    if (!exists && currentType === 'cube') requestDependencies([name], []);
+    else if (!exists && currentType === 'dimension') requestDependencies([], [name]);
 }
 
 function removeObject(name, type) {
@@ -1309,9 +1350,11 @@ function updateBrowseCount() {
 }
 
 function addBrowseSelected() {
+    const added = [];
     browseChecked.forEach(name => {
         if (!selectedObjects.some(o => o.name === name && o.type === currentType)) {
             selectedObjects.push({ name, type: currentType });
+            added.push(name);
         }
     });
     browseChecked.clear();
@@ -1319,10 +1362,181 @@ function addBrowseSelected() {
     document.getElementById('step3').classList.add('step-disabled');
     renderTags();
     renderBrowseList();
+    if (added.length && currentType === 'cube') requestDependencies(added, []);
+    else if (added.length && currentType === 'dimension') requestDependencies([], added);
 }
+
+// ---- Dependencies (cube -> rule, dimensions, views, subsets; dimension -> subsets) ----
+let depCandidates = [];
+
+function requestDependencies(cubes, dims) {
+    const src = document.getElementById('sourceInstance').value;
+    if (!src || (!cubes.length && !dims.length)) return;
+    depCandidates = [];
+    document.getElementById('depBox').style.display = 'block';
+    document.getElementById('depList').innerHTML = '<div style="opacity:.7;padding:6px;">Looking up dependencies&hellip;</div>';
+    document.getElementById('depAddBtn').disabled = true;
+    document.getElementById('depCount').textContent = '';
+    vscode.postMessage({ command: 'getDependencies', instanceName: src, cubes: cubes, dimensions: dims });
+}
+
+function suggestDependenciesForSelection() {
+    const cubes = selectedObjects.filter(o => o.type === 'cube').map(o => o.name);
+    const dims = selectedObjects.filter(o => o.type === 'dimension').map(o => o.name);
+    if (!cubes.length && !dims.length) { showError('Add at least one cube or dimension first.'); return; }
+    requestDependencies(cubes, dims);
+}
+
+function objectsWithPrefix(type, owner) {
+    const p = String(owner).toLowerCase() + ' : ';
+    return (objectsByType[type] || []).filter(n => n.toLowerCase().startsWith(p));
+}
+
+const DEP_CATS = [
+    { key: 'rule', label: 'Rule' },
+    { key: 'dimension', label: 'Dimensions' },
+    { key: 'view', label: 'Views' },
+    { key: 'subset', label: 'Subsets' }
+];
+
+function applyDependencies(msg) {
+    const groups = [];
+    const seen = new Set();
+    depCandidates = [];
+    function add(gi, type, name, checked) {
+        const key = type + '|' + name.toLowerCase();
+        if (seen.has(key) || selectedObjects.some(o => o.type === type && o.name.toLowerCase() === name.toLowerCase())) return;
+        seen.add(key);
+        depCandidates.push({ type: type, name: name, checked: checked, group: gi });
+    }
+    (msg.cubes || []).forEach(c => {
+        const gi = groups.push({ title: 'Cube: ' + c.cube }) - 1;
+        if (c.hasRules) add(gi, 'rule', c.cube, true);
+        (c.dimensions || []).forEach(d => add(gi, 'dimension', d, true));
+        objectsWithPrefix('view', c.cube).forEach(v => add(gi, 'view', v, false));
+        (c.dimensions || []).forEach(d => objectsWithPrefix('subset', d).forEach(s => add(gi, 'subset', s, false)));
+    });
+    (msg.dimensions || []).forEach(d => {
+        const gi = groups.push({ title: 'Dimension: ' + d }) - 1;
+        objectsWithPrefix('subset', d).forEach(s => add(gi, 'subset', s, false));
+    });
+
+    let html = (msg.errors || []).map(e => '<div style="color:var(--vscode-errorForeground);padding:4px;">' + escapeHtml(e) + '</div>').join('');
+    groups.forEach((g, gi) => {
+        const inGroup = depCandidates.map((c, i) => i).filter(i => depCandidates[i].group === gi);
+        if (!inGroup.length) return;
+        html += '<details class="dep-group" open><summary style="font-weight:600;font-size:12px;padding:4px;cursor:pointer;">'
+            + escapeHtml(g.title) + ' <span class="dep-cnt" data-g="' + gi + '"></span></summary>';
+        DEP_CATS.forEach(cat => {
+            const items = inGroup.filter(i => depCandidates[i].type === cat.key);
+            if (!items.length) return;
+            // Long lists (many views/subsets) start collapsed.
+            html += '<details class="dep-cat" data-g="' + gi + '" data-cat="' + cat.key + '"' + (items.length <= 10 ? ' open' : '') + ' style="margin-left:14px;">'
+                + '<summary style="font-size:12px;padding:2px 4px;cursor:pointer;">'
+                + '<span class="type-indicator type-indicator-' + cat.key + '">' + ((OBJ_TYPES[cat.key] || {}).short || '?') + '</span> '
+                + cat.label + ' <span class="dep-cnt" data-g="' + gi + '" data-cat="' + cat.key + '"></span>'
+                + ' <a href="#" class="dep-cat-all" data-on="1" style="font-size:11px;margin-left:8px;">all</a>'
+                + ' <a href="#" class="dep-cat-all" data-on="0" style="font-size:11px;margin-left:4px;">none</a>'
+                + '</summary>'
+                + items.map(i => '<label class="dep-item" data-idx="' + i + '" style="display:flex;align-items:center;gap:6px;padding:2px 4px 2px 22px;">'
+                    + '<input type="checkbox" class="dep-chk" data-idx="' + i + '"' + (depCandidates[i].checked ? ' checked' : '') + '> '
+                    + escapeHtml(depCandidates[i].name) + '</label>').join('')
+                + '</details>';
+        });
+        html += '</details>';
+    });
+    if (!depCandidates.length) {
+        html += '<div style="opacity:.7;padding:6px;">No further dependencies &mdash; everything is already in the list.</div>';
+    }
+    document.getElementById('depFilter').value = '';
+    document.getElementById('depList').innerHTML = html;
+    document.getElementById('depAddBtn').disabled = !depCandidates.length;
+    updateDepCount();
+}
+
+function depMatches(c) {
+    const q = (document.getElementById('depFilter').value || '').trim().toLowerCase();
+    return !q || c.name.toLowerCase().includes(q);
+}
+
+function filterDependencies() {
+    const q = (document.getElementById('depFilter').value || '').trim();
+    document.querySelectorAll('#depList .dep-item').forEach(el => {
+        el.style.display = depMatches(depCandidates[parseInt(el.getAttribute('data-idx'), 10)]) ? 'flex' : 'none';
+    });
+    document.querySelectorAll('#depList .dep-cat').forEach(cat => {
+        const hits = Array.from(cat.querySelectorAll('.dep-item')).some(el => el.style.display !== 'none');
+        cat.style.display = hits ? '' : 'none';
+        if (q && hits) cat.open = true;
+    });
+    document.querySelectorAll('#depList .dep-group').forEach(g => {
+        g.style.display = Array.from(g.querySelectorAll('.dep-cat')).some(c => c.style.display !== 'none') ? '' : 'none';
+    });
+}
+
+function updateDepCount() {
+    const n = depCandidates.filter(c => c.checked).length;
+    document.getElementById('depCount').textContent = n + ' of ' + depCandidates.length + ' selected';
+    document.querySelectorAll('#depList .dep-cnt').forEach(el => {
+        const g = parseInt(el.getAttribute('data-g'), 10);
+        const cat = el.getAttribute('data-cat');
+        const list = depCandidates.filter(c => c.group === g && (!cat || c.type === cat));
+        el.textContent = '(' + list.filter(c => c.checked).length + '/' + list.length + ')';
+        el.style.cssText = 'font-weight:normal;font-size:11px;color:var(--vscode-descriptionForeground);';
+    });
+}
+
+function setDepChecked(predicate, on) {
+    depCandidates.forEach((c, i) => {
+        if (!predicate(c) || !depMatches(c)) return;
+        c.checked = on;
+        const el = document.querySelector('#depList .dep-chk[data-idx="' + i + '"]');
+        if (el) el.checked = on;
+    });
+    updateDepCount();
+}
+
+function depSelectAll(on) {
+    setDepChecked(() => true, on);
+}
+
+function addDependencies() {
+    depCandidates.filter(c => c.checked).forEach(c => {
+        if (!selectedObjects.some(o => o.type === c.type && o.name === c.name)) selectedObjects.push({ name: c.name, type: c.type });
+    });
+    checkResults = [];
+    document.getElementById('step3').classList.add('step-disabled');
+    renderTags();
+    closeDependencies();
+}
+
+function closeDependencies() {
+    depCandidates = [];
+    document.getElementById('depBox').style.display = 'none';
+}
+
+document.addEventListener('change', e => {
+    const t = e.target;
+    if (t && t.classList && t.classList.contains('dep-chk')) {
+        const c = depCandidates[parseInt(t.getAttribute('data-idx'), 10)];
+        if (c) { c.checked = t.checked; updateDepCount(); }
+    }
+});
+
+document.addEventListener('click', e => {
+    const a = e.target && e.target.closest ? e.target.closest('.dep-cat-all') : null;
+    if (!a) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cat = a.closest('.dep-cat');
+    const g = parseInt(cat.getAttribute('data-g'), 10);
+    const type = cat.getAttribute('data-cat');
+    setDepChecked(c => c.group === g && c.type === type, a.getAttribute('data-on') === '1');
+});
 
 function clearSelected() {
     selectedObjects = [];
+    closeDependencies();
     checkResults = [];
     document.getElementById('step3').classList.add('step-disabled');
     renderTags();

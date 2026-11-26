@@ -81,6 +81,7 @@ export class ProcessBaseline {
             const obj = JSON.parse(propertiesJSON);
             if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
                 delete (obj as any).Variables;
+                delete (obj as any).VariablesUIData;
                 const ds = (obj as any).DataSource;
                 if (ds && typeof ds === 'object') {
                     // TM1 returns the encrypted password differently on each request.

@@ -69,9 +69,16 @@ export class Tm1McpServer {
 
     /** Starts the server (idempotent) and returns the endpoint + auth token. */
     async ensureStarted(): Promise<{ uri: string; token: string; version: string }> {
-        if (!this.httpServer) {
+        if (!this.httpServer || this.port === 0) {
             if (!this.starting) this.starting = this.start();
-            await this.starting;
+            const starting = this.starting;
+            try {
+                await starting;
+            } catch (e) {
+                // Allow a retry (e.g. after the port was freed or changed).
+                if (this.starting === starting) this.starting = undefined;
+                throw e;
+            }
         }
         return { uri: `http://127.0.0.1:${this.port}/mcp`, token: this.token, version: SERVER_INFO.version };
     }
@@ -82,6 +89,7 @@ export class Tm1McpServer {
     dispose(): void {
         try { this.httpServer?.close(); } catch { /* ignore */ }
         this.httpServer = undefined;
+        this.port = 0;
         this.starting = undefined;
         this.sessions.clear();
     }
@@ -123,15 +131,20 @@ export class Tm1McpServer {
         // A fixed port gives external clients a stable URL to configure once.
         // 0 (default) keeps the original behaviour: an OS-assigned random port.
         const fixedPort = vscode.workspace.getConfiguration('pa-code').get<number>('mcpServer.port', 0) || 0;
-        this.httpServer = http.createServer((req, res) => { void this.handle(req, res); });
-        return new Promise((resolve, reject) => {
-            this.httpServer!.on('error', reject);
-            this.httpServer!.listen(fixedPort, '127.0.0.1', () => {
-                const addr = this.httpServer!.address();
-                if (addr && typeof addr === 'object') this.port = addr.port;
-                resolve();
+        const server = http.createServer((req, res) => { void this.handle(req, res); });
+        await new Promise<void>((resolve, reject) => {
+            server.once('error', (e: any) => {
+                try { server.close(); } catch { /* ignore */ }
+                reject(e?.code === 'EADDRINUSE'
+                    ? new Error(`MCP port ${fixedPort} is already in use (another VS Code window running PA-Code?). Choose a different 'pa-code.mcpServer.port' or close the other window.`)
+                    : e);
             });
+            server.listen(fixedPort, '127.0.0.1', () => resolve());
         });
+        const addr = server.address();
+        this.port = addr && typeof addr === 'object' ? addr.port : 0;
+        // Only publish the server once it is actually listening, so callers never see port 0.
+        this.httpServer = server;
     }
 
     private authOk(req: http.IncomingMessage): boolean {

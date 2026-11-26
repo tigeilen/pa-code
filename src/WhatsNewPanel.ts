@@ -561,6 +561,50 @@ code { background: rgba(127,127,127,0.18); padding:1px 5px; border-radius:4px; f
             </div>
         </section>
 
+        <!-- SLIDE 11 (headline: 3.9.0) -->
+        <section class="slide">
+            <div class="wrap">
+                <div class="hero">
+                    <span class="pill">VERSION 3.9.0 · HEADLINE</span>
+                    <h1>🧩 Smarter deployments, TM1 v12 logs &amp; PAW-exact processes</h1>
+                    <p>Pull in a cube's dependencies with one click, read process logs on TM1 v12 / PA as a Service, clone environments — and process variables, parameters and ODBC datasources now save exactly the way PAW expects.</p>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">🔗</span> Deployment dependencies <span class="emoji">✨</span></h2>
+                    <p class="sub">Add a cube or dimension — PA-Code offers what it needs (#15)</p>
+                    <ul>
+                        <li>Adding a <strong>cube</strong> suggests its <strong>rule</strong>, <strong>dimensions</strong>, <strong>views</strong> and the <strong>subsets</strong> of its dimensions; adding a <strong>dimension</strong> suggests its subsets. Rules and dimensions are pre-selected.</li>
+                        <li><strong>Collapsible groups</strong> per cube/dimension and per category with counts and all/none links — long lists start collapsed.</li>
+                        <li><strong>Search</strong> across all dependencies; a new <strong>Add Dependencies…</strong> button works on the whole list.</li>
+                    </ul>
+                </div>
+                <div class="card feature">
+                    <h2><span class="emoji">📜</span> Server Log on TM1 v12 / PA as a Service</h2>
+                    <p class="sub">v12 no longer exposes the message log via REST (#11)</p>
+                    <ul>
+                        <li>The Server Log now shows the <strong>process execution logs</strong> v12 writes for every run — searchable, filterable per process, with live tail. A banner explains the v12 behaviour.</li>
+                        <li>Running a process on v12 no longer pops open a JSON log on success — use <strong>Show Log</strong>; failures still open it, now in readable form.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2><span class="emoji">⚙️</span> Processes save exactly like PAW</h2>
+                    <ul>
+                        <li><strong>Variables on Cube View / ASCII / ODBC datasources</strong> now show in PAW after adding or deleting them — PA-Code keeps PAW's per-variable settings (<code>VariablesUIData</code>) in sync. Existing Git files need no update.</li>
+                        <li><strong>Parameters</strong> are written as <code>String</code> / <code>Numeric</code> with a matching value type (no more 1/2).</li>
+                        <li><strong>ODBC datasources</strong> use PAW's field set (<code>userName</code>, <code>password</code>, <code>query</code>, <code>usesUnicode</code>).</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2><span class="emoji">🧰</span> More</h2>
+                    <ul>
+                        <li><strong>Clone</strong> an environment from the settings list (#13).</li>
+                        <li><strong>MCP endpoint</strong> no longer shows port 0 — a busy fixed port now reports a clear error (#14).</li>
+                        <li>Wording: <strong>TM1 v12</strong> instead of “PA Engine” (#16) · refreshed PA-Code logo.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
     </div>
 </div>
 <div class="hint">Use ‹ / › or your arrow keys to browse between versions · Reopen anytime via <code>PA-Code: What's New</code></div>

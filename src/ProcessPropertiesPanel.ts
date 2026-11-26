@@ -631,9 +631,9 @@ function populateDsFields() {
         setVal('ds-decimal', ds.asciiDecimalSeparator || ds.dataSourceDecimalSeparator || '.');
     } else if (type === 'ODBC') {
         setVal('ds-dsn', ds.dataSourceNameForServer || ds.DatasourceNameForServer || '');
-        setVal('ds-user', ds.dataSourceUserName || ds.DatasourceUserName || '');
-        setVal('ds-pass', ds.dataSourcePassword || ds.DatasourcePassword || '');
-        setVal('ds-query', ds.dataSourceQuery || ds.DatasourceQuery || '');
+        setVal('ds-user', ds.userName ?? ds.UserName ?? ds.dataSourceUserName ?? ds.DatasourceUserName ?? '');
+        setVal('ds-pass', ds.password ?? ds.Password ?? ds.dataSourcePassword ?? ds.DatasourcePassword ?? '');
+        setVal('ds-query', ds.query ?? ds.Query ?? ds.dataSourceQuery ?? ds.DatasourceQuery ?? '');
     }
 }
 
@@ -649,6 +649,11 @@ function getVal(id) {
 document.getElementById('dsType').addEventListener('change', renderDsFields);
 
 // Parameters
+function parameterTypeLabel(type) {
+    const value = String(type ?? '').trim().toLowerCase();
+    return value === 'numeric' || value === '1' ? 'Numeric' : 'String';
+}
+
 function renderParameters() {
     const body = document.getElementById('paramBody');
     const empty = document.getElementById('paramEmpty');
@@ -659,7 +664,7 @@ function renderParameters() {
         <td>\${i + 1}</td>
         <td><input value="\${esc(p.Name || '')}" data-idx="\${i}" data-field="Name"></td>
         <td><input value="\${esc(p.Prompt || '')}" data-idx="\${i}" data-field="Prompt"></td>
-        <td><select data-idx="\${i}" data-field="Type"><option value="2" \${p.Type===2?'selected':''}>String</option><option value="1" \${p.Type===1?'selected':''}>Numeric</option></select></td>
+        <td><select data-idx="\${i}" data-field="Type"><option value="String" \${parameterTypeLabel(p.Type)==='String'?'selected':''}>String</option><option value="Numeric" \${parameterTypeLabel(p.Type)==='Numeric'?'selected':''}>Numeric</option></select></td>
         <td><input value="\${esc(String(p.Value ?? ''))}" data-idx="\${i}" data-field="Value"></td>
         <td><button class="btn btn-danger" onclick="removeParam(\${i})" title="Remove">\u00d7</button></td>
     </tr>\`).join('');
@@ -668,7 +673,7 @@ function renderParameters() {
 function addParameter() {
     if (!properties.Parameters) properties.Parameters = [];
     properties.Parameters = collectParameters();
-    properties.Parameters.push({ Name: 'pNew', Prompt: '', Value: '', Type: 2 });
+    properties.Parameters.push({ Name: 'pNew', Prompt: '', Value: '', Type: 'String' });
     renderParameters();
 }
 
@@ -748,11 +753,17 @@ function collectDsProperties() {
         delete ds.dataSourceHeaderLines; delete ds.dataSourceColumnDelimiter;
         delete ds.dataSourceQuoteCharacter; delete ds.dataSourceDecimalSeparator;
     } else if (type === 'ODBC') {
-        ds.dataSourceNameForServer = getVal('ds-dsn');
-        if (ds.dataSourceNameForClient === undefined) ds.dataSourceNameForClient = '';
-        ds.dataSourceUserName = getVal('ds-user');
-        ds.dataSourcePassword = getVal('ds-pass');
-        ds.dataSourceQuery = getVal('ds-query');
+        const dsn = getVal('ds-dsn');
+        const odbc = {
+            Type: 'ODBC',
+            dataSourceNameForClient: dsn,
+            dataSourceNameForServer: dsn,
+            password: getVal('ds-pass'),
+            query: getVal('ds-query'),
+            userName: getVal('ds-user')
+        };
+        if (typeof orig.usesUnicode === 'boolean') odbc.usesUnicode = orig.usesUnicode;
+        return odbc;
     }
 
     return ds;
@@ -765,8 +776,8 @@ function collectParameters() {
         const p = properties.Parameters[i] || {};
         inputs.forEach(inp => {
             const field = inp.dataset.field;
-            if (field === 'Type') p.Type = parseInt(inp.value);
-            else if (field === 'Value') p.Value = p.Type === 1 ? (parseFloat(inp.value) || 0) : inp.value;
+            if (field === 'Type') p.Type = parameterTypeLabel(inp.value);
+            else if (field === 'Value') p.Value = p.Type === 'Numeric' ? (parseFloat(inp.value) || 0) : inp.value;
             else if (field) p[field] = inp.value;
         });
         return p;
@@ -791,6 +802,8 @@ function save() {
         Parameters: collectParameters(),
         DataSource: collectDsProperties(),
         Variables: collectVariables(),
+        // Realigned to the edited variables by PA-Code when the process is saved to TM1.
+        ...(Array.isArray(properties.VariablesUIData) ? { VariablesUIData: properties.VariablesUIData } : {}),
         HasSecurityAccess: properties.HasSecurityAccess || false
     };
     vscode.postMessage({ command: 'saveProperties', properties: result });

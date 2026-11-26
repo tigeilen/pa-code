@@ -868,14 +868,32 @@ export class TM1Service {
     public async getProcessCode(instanceName: string, processName: string): Promise<TM1ProcessContent> {
         const cfg = this.getConfig(instanceName);
         const encodedName = encodeURIComponent(processName).replace(/'/g, "''");
-        const response = await axios.get(`${cfg.url}/api/v1/Processes('${encodedName}')?$select=PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters,DataSource,Variables,HasSecurityAccess`, {
+        const response = await axios.get(`${cfg.url}/api/v1/Processes('${encodedName}')?$select=PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters,DataSource,Variables,VariablesUIData,HasSecurityAccess`, {
             httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
         });
         const data = response.data;
         return {
             Prolog: data.PrologProcedure || '', Metadata: data.MetadataProcedure || '', Data: data.DataProcedure || '', Epilog: data.EpilogProcedure || '',
-            PropertiesJSON: JSON.stringify({ Parameters: data.Parameters || [], DataSource: data.DataSource || {}, Variables: data.Variables || [], HasSecurityAccess: data.HasSecurityAccess || false }, null, 2)
+            PropertiesJSON: TM1Service.processPropertiesJSON(data)
         };
+    }
+
+    /** Variables in datasource column order: TM1 returns them unsorted, but Position and VariablesUIData follow the columns. */
+    private static sortVariables(vars: any): any[] {
+        if (!Array.isArray(vars)) return [];
+        return vars.map((v, i) => ({ v, i }))
+            .sort((a, b) => (Number(a.v?.Position) || Infinity) - (Number(b.v?.Position) || Infinity) || a.i - b.i)
+            .map(x => x.v);
+    }
+
+    private static processPropertiesJSON(data: any): string {
+        return JSON.stringify({
+            Parameters: data.Parameters || [],
+            DataSource: data.DataSource || {},
+            Variables: TM1Service.sortVariables(data.Variables),
+            VariablesUIData: data.VariablesUIData || [],
+            HasSecurityAccess: data.HasSecurityAccess || false
+        }, null, 2);
     }
 
     // Bulk fetch of every process' code (single request) for lineage analysis.
@@ -930,14 +948,14 @@ export class TM1Service {
         if (type === 'normal') filterStr = "&$filter=not startswith(Name,'}')";
         else if (type === 'control') filterStr = "&$filter=startswith(Name,'}')";
 
-        const response = await axios.get(`${cfg.url}/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters,DataSource,Variables,HasSecurityAccess${filterStr}`, {
+        const response = await axios.get(`${cfg.url}/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters,DataSource,Variables,VariablesUIData,HasSecurityAccess${filterStr}`, {
             httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
         });
         return response.data.value.map((item: any) => ({
             Name: item.Name,
             Content: {
                 Prolog: item.PrologProcedure || '', Metadata: item.MetadataProcedure || '', Data: item.DataProcedure || '', Epilog: item.EpilogProcedure || '',
-                PropertiesJSON: JSON.stringify({ Parameters: item.Parameters || [], DataSource: item.DataSource || {}, Variables: item.Variables || [], HasSecurityAccess: item.HasSecurityAccess || false }, null, 2)
+                PropertiesJSON: TM1Service.processPropertiesJSON(item)
             }
         }));
     }
@@ -949,7 +967,9 @@ export class TM1Service {
     //  - Variables are emitted with only the valid ProcessVariable properties
     //    (Name, Type, Position, StartByte, EndByte), renumbered and de-duplicated,
     //    so a hand-added variable saves and shows in PAW.
-    private normalizeProcessProperties(properties: any): any {
+    //  - VariablesUIData (PAW's per-column "Contents" settings, one entry per
+    //    variable in column order) is realigned, otherwise PAW shows stale variables.
+    private normalizeProcessProperties(properties: any, server?: { Variables?: any[]; VariablesUIData?: string[] }, exactUIData = false): any {
         if (!properties || typeof properties !== 'object') return properties;
         let result = properties;
 
@@ -969,12 +989,44 @@ export class TM1Service {
                 }
             }
             result = { ...result, DataSource: fixed };
+        } else if (ds && typeof ds === 'object' && ds.Type === 'ODBC') {
+            const dsn = ds.dataSourceNameForServer ?? ds.DatasourceNameForServer ?? '';
+            result = {
+                ...result,
+                DataSource: {
+                    Type: 'ODBC',
+                    dataSourceNameForClient: ds.dataSourceNameForClient ?? ds.DatasourceNameForClient ?? dsn,
+                    dataSourceNameForServer: dsn,
+                    password: ds.password ?? ds.Password ?? ds.dataSourcePassword ?? ds.DatasourcePassword ?? '',
+                    query: ds.query ?? ds.Query ?? ds.dataSourceQuery ?? ds.DatasourceQuery ?? '',
+                    userName: ds.userName ?? ds.UserName ?? ds.dataSourceUserName ?? ds.DatasourceUserName ?? '',
+                    ...(typeof ds.usesUnicode === 'boolean' ? { usesUnicode: ds.usesUnicode } : {})
+                }
+            };
+        }
+
+        if (Array.isArray(result.Parameters)) {
+            // TM1 derives the parameter type from the JSON type of Value and ignores Type,
+            // so a Numeric parameter must carry a number (and a String one a string).
+            result = {
+                ...result,
+                Parameters: result.Parameters.map((p: any) => {
+                    if (!p || typeof p !== 'object') return p;
+                    const t = String(p.Type ?? '').trim().toLowerCase();
+                    const numeric = t === 'numeric' || t === 'n' || t === '1' || (p.Type === undefined && typeof p.Value === 'number');
+                    if (numeric) {
+                        const n = typeof p.Value === 'number' ? p.Value : parseFloat(String(p.Value ?? '').replace(',', '.'));
+                        return { ...p, Type: 'Numeric', Value: Number.isFinite(n) ? n : 0 };
+                    }
+                    return { ...p, Type: 'String', Value: p.Value == null ? '' : String(p.Value) };
+                })
+            };
         }
 
         if (Array.isArray(result.Variables)) {
             const seen = new Set<string>();
             const cleaned: any[] = [];
-            for (const v of result.Variables) {
+            for (const v of TM1Service.sortVariables(result.Variables)) {
                 if (!v || typeof v !== 'object' || v.Name == null || v.Name === '') continue;
                 const key = String(v.Name).toLowerCase();
                 if (seen.has(key)) continue; // dedupe by name
@@ -990,16 +1042,107 @@ export class TM1Service {
                 });
             }
             result = { ...result, Variables: cleaned };
+            const uiData = TM1Service.alignVariablesUIData(cleaned, result.VariablesUIData, server, exactUIData);
+            if (uiData) result = { ...result, VariablesUIData: uiData };
+            else delete result.VariablesUIData;
+        } else if (result.VariablesUIData !== undefined && !Array.isArray(result.VariablesUIData)) {
+            result = { ...result };
+            delete result.VariablesUIData;
         }
         return result;
     }
 
-    public async updateProcessCode(instanceName: string, processName: string, code: any): Promise<void> {
+    /**
+     * Builds VariablesUIData for the given variables. Entries with VarName= (formula
+     * variables) or IgnoredInputVarName= (ignored columns) are kept in place; the
+     * remaining "data" entries map 1:1 to the variables in column order.
+     */
+    private static alignVariablesUIData(vars: any[], base: any, server?: { Variables?: any[]; VariablesUIData?: string[] }, exact = false): string[] | undefined {
+        const isData = (e: string) => !/(^|\f)(VarName|IgnoredInputVarName)=/.test(e);
+        const code = (v: any) => (v.Type === 'Numeric' ? 33 : 32);
+        const withType = (e: string, v: any) => /(^|\f)VarType=\d+/.test(e)
+            ? e.replace(/(^|\f)VarType=\d+/, `$1VarType=${code(v)}`)
+            : `VarType=${code(v)}\f${e}`;
+        const fresh = (v: any) => `VarType=${code(v)}\fColType=827\f`;
+
+        const serverUI = Array.isArray(server?.VariablesUIData) ? server!.VariablesUIData!.map(String) : undefined;
+        const serverVars = server?.Variables ? TM1Service.sortVariables(server.Variables) : undefined;
+        const baseIn: string[] | undefined = Array.isArray(base) ? base.map(String) : undefined;
+        const dataCount = (ui: string[]) => ui.filter(isData).length;
+
+        // Pick the UI data that matches a known variable list:
+        //  - exact (deployment): the JSON's own UI data already follows `vars`;
+        //  - otherwise the JSON's UI data if it still describes the server's variables,
+        //    else the server's (the local copy can be stale after an earlier save).
+        let source: string[] | undefined;
+        let alignedTo: any[] | undefined;
+        if (exact && baseIn && dataCount(baseIn) === vars.length) {
+            source = baseIn; alignedTo = vars;
+        } else if (serverVars && baseIn && dataCount(baseIn) === serverVars.length) {
+            source = baseIn; alignedTo = serverVars;
+        } else if (serverVars && serverUI && dataCount(serverUI) === serverVars.length) {
+            source = serverUI; alignedTo = serverVars;
+        } else if (baseIn && dataCount(baseIn) === vars.length) {
+            source = baseIn; alignedTo = vars;
+        } else {
+            source = baseIn ?? serverUI;
+        }
+        // Processes without UI data (common for "None" datasources) work in PAW as-is.
+        if (!source || source.length === 0) return undefined;
+        const srcData = source.filter(isData);
+
+        let entries: string[];
+        if (alignedTo && alignedTo !== vars) {
+            const byName = new Map<string, string>();
+            alignedTo.forEach((sv: any, i: number) => byName.set(String(sv.Name).toLowerCase(), srcData[i]));
+            const newNames = new Set(vars.map(v => String(v.Name).toLowerCase()));
+            entries = vars.map((v, i) => {
+                const hit = byName.get(String(v.Name).toLowerCase());
+                if (hit !== undefined) return withType(hit, v);
+                // Renamed in place: the old name at this column is gone, so keep its settings.
+                const old = alignedTo![i];
+                if (old && !newNames.has(String(old.Name).toLowerCase()) && srcData[i] !== undefined) return withType(srcData[i], v);
+                return fresh(v);
+            });
+        } else {
+            entries = vars.map((v, i) => (alignedTo && srcData[i] !== undefined ? withType(srcData[i], v) : fresh(v)));
+        }
+        const baseUI = source;
+
+        const out: string[] = [];
+        let next = 0;
+        let lastDataPos = -1;
+        for (const e of baseUI) {
+            if (isData(e)) {
+                if (next < entries.length) { out.push(entries[next++]); lastDataPos = out.length - 1; }
+            } else {
+                out.push(e);
+            }
+        }
+        if (next < entries.length) {
+            const firstFormula = out.findIndex((e, i) => i > lastDataPos && /(^|\f)VarName=/.test(e));
+            const insertAt = firstFormula >= 0 ? firstFormula : out.length;
+            out.splice(insertAt, 0, ...entries.slice(next));
+        }
+        return out;
+    }
+
+    /** @param opts.exactVariablesUIData the JSON's VariablesUIData already matches its Variables (e.g. copied from another server). */
+    public async updateProcessCode(instanceName: string, processName: string, code: any, opts?: { exactVariablesUIData?: boolean }): Promise<void> {
         const cfg = this.getConfig(instanceName);
         const encodedName = encodeURIComponent(processName).replace(/'/g, "''");
         let properties: any = {};
         try { if (code.PropertiesJSON) properties = JSON.parse(code.PropertiesJSON); } catch (e) { throw new Error("JSON Syntax Error"); }
-        properties = this.normalizeProcessProperties(properties);
+        let server: { Variables?: any[]; VariablesUIData?: string[] } | undefined;
+        if (properties && Array.isArray(properties.Variables)) {
+            try {
+                const cur = await axios.get(`${cfg.url}/api/v1/Processes('${encodedName}')?$select=Variables,VariablesUIData`, {
+                    httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
+                });
+                server = { Variables: cur.data.Variables || [], VariablesUIData: cur.data.VariablesUIData || [] };
+            } catch { /* new process or older server: align without server state */ }
+        }
+        properties = this.normalizeProcessProperties(properties, server, !!opts?.exactVariablesUIData);
 
         try {
             await axios.patch(`${cfg.url}/api/v1/Processes('${encodedName}')`, {
@@ -1162,19 +1305,20 @@ export class TM1Service {
     public async getErrorLog(instanceName: string, logFileName: string): Promise<string> {
         const cfg = this.getConfig(instanceName);
         const encodedName = encodeURIComponent(logFileName).replace(/'/g, "''");
+        // Raw text: v12 logs are JSON Lines, and a one-line log would otherwise be auto-parsed into an object.
+        const textOpts = {
+            httpsAgent: this.httpsAgent, headers: { ...this.getHeaders(instanceName), 'Accept': '*/*' },
+            responseType: 'text' as const, transformResponse: (d: any) => d
+        };
         try {
             // First try ErrorLogFiles endpoint (standard for TM1 11/12)
             try {
                 // In some versions it is /$value, in others /Content
-                const response = await axios.get(`${cfg.url}/api/v1/ErrorLogFiles('${encodedName}')/$value`, {
-                    httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
-                });
+                const response = await axios.get(`${cfg.url}/api/v1/ErrorLogFiles('${encodedName}')/$value`, textOpts);
                 return response.data;
             } catch (e) {
                 // Fallback to Content property just in case
-                const response = await axios.get(`${cfg.url}/api/v1/ErrorLogFiles('${encodedName}')/Content`, {
-                    httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
-                });
+                const response = await axios.get(`${cfg.url}/api/v1/ErrorLogFiles('${encodedName}')/Content`, textOpts);
                 return response.data;
             }
         } catch (error: any) {
@@ -1218,8 +1362,128 @@ export class TM1Service {
     }
 
     // --- MESSAGE LOG ---
+    /** Returns the server's ProductVersion (e.g. "12.6.6"), or '' if it can't be read. */
+    public async getProductVersion(instanceName: string): Promise<string> {
+        const cfg = this.getConfig(instanceName);
+        const headers = { ...this.getHeaders(instanceName), 'Accept': '*/*' };
+        try {
+            const response = await axios.get(`${cfg.url}/api/v1/Configuration/ProductVersion/$value`, {
+                httpsAgent: this.httpsAgent, headers, responseType: 'text', transformResponse: (d: any) => d, timeout: 15000
+            });
+            const v = String(response.data ?? '').trim();
+            if (v) return v;
+        } catch { /* try the JSON form below */ }
+        try {
+            const response = await axios.get(`${cfg.url}/api/v1/Configuration/ProductVersion`, {
+                httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 15000
+            });
+            return String(response.data?.value ?? '').trim();
+        } catch {
+            return '';
+        }
+    }
+
+    private v12Cache = new Map<string, { url: string; v12: boolean }>();
+
+    /** True for TM1 v12 / PA as a Service, where the database message log is not exposed via REST. */
+    public async isV12(instanceName: string): Promise<boolean> {
+        const cfg = this.getConfig(instanceName);
+        const cached = this.v12Cache.get(instanceName);
+        if (cached && cached.url === cfg.url) return cached.v12;
+        // PAaaS / v12 tenant REST URLs look like https://<host>/api/<tenant>/v0/tm1/<database>
+        if (/\/v0\/tm1\//i.test(cfg.url)) {
+            this.v12Cache.set(instanceName, { url: cfg.url, v12: true });
+            return true;
+        }
+        const version = await this.getProductVersion(instanceName);
+        if (!version) return false;
+        const v12 = parseInt(version, 10) >= 12;
+        this.v12Cache.set(instanceName, { url: cfg.url, v12 });
+        return v12;
+    }
+
+    private processLogCache = new Map<string, any[]>();
+
+    /** Maps one v12 process log (JSON Lines: id, level, timestamp, name, message) to message-log entries. */
+    private parseProcessLogFile(fileName: string, fileTs: string, text: string): any[] {
+        const out: any[] = [];
+        for (const raw of String(text ?? '').split(/\r?\n/)) {
+            const line = raw.trim();
+            if (!line) continue;
+            let j: any;
+            try { j = JSON.parse(line); } catch { j = undefined; }
+            if (j && typeof j === 'object') {
+                let level = String(j.level ?? j.Level ?? 'INFO').toUpperCase();
+                if (level === 'WARN') level = 'WARNING';
+                out.push({
+                    TimeStamp: j.timestamp ?? j.TimeStamp ?? fileTs,
+                    Level: level,
+                    Logger: j.name ? `TM1.Process: ${j.name}` : 'TM1.Process',
+                    Thread: j.id ?? '',
+                    Message: String(j.message ?? j.Message ?? line),
+                    File: fileName
+                });
+            } else {
+                out.push({ TimeStamp: fileTs, Level: /error/i.test(line) ? 'ERROR' : 'INFO', Logger: 'TM1.Process', Thread: '', Message: line, File: fileName });
+            }
+        }
+        return out;
+    }
+
+    /**
+     * TM1 v12 has no database message log via REST (MessageLogEntries stays empty).
+     * Each process run writes its own log file to ErrorLogFiles instead, so the
+     * message log is rebuilt from those files, newest first, capped at `top`.
+     */
+    private async getV12ProcessLogEntries(instanceName: string, opts: { since?: string; after?: string; before?: string; top?: number }): Promise<any[]> {
+        const cfg = this.getConfig(instanceName);
+        const response = await axios.get(`${cfg.url}/api/v1/ErrorLogFiles`, {
+            httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 60000
+        });
+        let files = (response.data.value || [])
+            .map((f: any) => ({ name: String(f.Filename || f.Name || ''), ts: String(f.LastUpdated || f.LastModified || f.Timestamp || '') }))
+            .filter((f: any) => f.name);
+        const lowerBound = opts.after || opts.since;
+        if (lowerBound) files = files.filter((f: any) => !f.ts || f.ts >= lowerBound);
+        files.sort((a: any, b: any) => (b.ts || b.name).localeCompare(a.ts || a.name));
+
+        const top = opts.top ?? 2000;
+        const maxFiles = 300;
+        const entries: any[] = [];
+        const keep = (e: any) => {
+            const t = String(e.TimeStamp || '');
+            if (opts.since && t < opts.since) return false;
+            if (opts.after && t <= opts.after) return false;
+            if (opts.before && t >= opts.before) return false;
+            return true;
+        };
+        const batchSize = 8;
+        for (let i = 0; i < Math.min(files.length, maxFiles) && entries.length < top; i += batchSize) {
+            const batch = files.slice(i, Math.min(i + batchSize, maxFiles));
+            const parsed = await Promise.all(batch.map(async (f: any) => {
+                const key = `${instanceName}|${f.name}|${f.ts}`;
+                const hit = f.ts ? this.processLogCache.get(key) : undefined;
+                if (hit) return hit;
+                try {
+                    const rows = this.parseProcessLogFile(f.name, f.ts, await this.getErrorLog(instanceName, f.name));
+                    if (f.ts) this.processLogCache.set(key, rows);
+                    return rows;
+                } catch {
+                    return [];
+                }
+            }));
+            for (const rows of parsed) entries.push(...rows.filter(keep));
+        }
+        if (this.processLogCache.size > 5000) this.processLogCache.clear();
+        entries.sort((a, b) => String(a.TimeStamp).localeCompare(String(b.TimeStamp)));
+        return entries.length > top ? entries.slice(entries.length - top) : entries;
+    }
+
     public async getMessageLogEntries(instanceName: string, top: number = 200): Promise<any[]> {
         const cfg = this.getConfig(instanceName);
+        if (await this.isV12(instanceName)) {
+            return this.getV12ProcessLogEntries(instanceName, { top });
+        }
         try {
             // Fetches the latest 'top' entries, descending by timestamp
             const response = await axios.get(`${cfg.url}/api/v1/MessageLogEntries?$top=${top}&$orderby=TimeStamp desc`, {
@@ -1237,6 +1501,9 @@ export class TM1Service {
     // analysis. Capped by `top` to stay responsive on busy servers.
     public async getMessageLogEntriesWindow(instanceName: string, sinceIso: string, top: number = 20000): Promise<any[]> {
         const cfg = this.getConfig(instanceName);
+        if (await this.isV12(instanceName)) {
+            return this.getV12ProcessLogEntries(instanceName, { since: sinceIso, top });
+        }
         const filterStr = encodeURIComponent(`TimeStamp ge ${sinceIso}`);
         const response = await axios.get(
             `${cfg.url}/api/v1/MessageLogEntries?$filter=${filterStr}&$orderby=TimeStamp asc&$top=${top}`,
@@ -1248,6 +1515,9 @@ export class TM1Service {
     public async getMessageLogEntriesSince(instanceName: string, timestamp: string): Promise<any[]> {
         const cfg = this.getConfig(instanceName);
         try {
+            if (await this.isV12(instanceName)) {
+                return await this.getV12ProcessLogEntries(instanceName, { after: timestamp, top: 5000 });
+            }
             // Filters for entries strictly newer than the given timestamp
             const filterStr = encodeURIComponent(`TimeStamp gt ${timestamp}`);
             // Fetch all newer, ordered ascending
@@ -1264,6 +1534,9 @@ export class TM1Service {
     public async getMessageLogEntriesBefore(instanceName: string, timestamp: string, top: number = 1000): Promise<any[]> {
         const cfg = this.getConfig(instanceName);
         try {
+            if (await this.isV12(instanceName)) {
+                return await this.getV12ProcessLogEntries(instanceName, { before: timestamp, top });
+            }
             const filterStr = encodeURIComponent(`TimeStamp lt ${timestamp}`);
             const response = await axios.get(`${cfg.url}/api/v1/MessageLogEntries?$filter=${filterStr}&$top=${top}&$orderby=TimeStamp desc`, {
                 httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName)
@@ -3259,6 +3532,23 @@ export class TM1Service {
 
     // --- DEPLOYMENT: VIEWS & SUBSETS (issue #10, phase 2) ---
 
+    /** Dimensions of a cube and whether it has a rule — used to suggest deployment dependencies. */
+    public async getCubeDependencies(instanceName: string, cubeName: string): Promise<{ dimensions: string[]; hasRules: boolean }> {
+        const cfg = this.getConfig(instanceName);
+        const enc = encodeURIComponent(cubeName.replace(/'/g, "''"));
+        try {
+            const resp = await axios.get(`${cfg.url}/api/v1/Cubes('${enc}')?$select=Name,Rules&$expand=Dimensions($select=Name)`,
+                { httpsAgent: this.httpsAgent, headers: this.getHeaders(instanceName), timeout: 30000 });
+            this.updateCookieFromResponse(instanceName, resp);
+            return {
+                dimensions: (resp.data.Dimensions || []).map((d: any) => d.Name),
+                hasRules: !!(resp.data.Rules && String(resp.data.Rules).trim())
+            };
+        } catch (error: any) {
+            throw new Error(`Failed to read dependencies of cube '${cubeName}': ${error.response?.data?.error?.message || error.message}`);
+        }
+    }
+
     /** Lists all public views as "Cube : View" strings via a single expanded query. */
     public async getAllViewsForDeploy(instanceName: string): Promise<string[]> {
         const cfg = this.getConfig(instanceName);
@@ -3932,6 +4222,11 @@ export class TM1Service {
     public async getChoreHistory(instanceName: string, choreName: string, top: number = 50): Promise<any[]> {
         const cfg = this.getConfig(instanceName);
         try {
+            if (await this.isV12(instanceName)) {
+                const needle = choreName.toLowerCase();
+                const rows = await this.getV12ProcessLogEntries(instanceName, { top: 20000 });
+                return rows.filter(e => String(e.Message).toLowerCase().includes(needle)).reverse().slice(0, top);
+            }
             const safeName = choreName.replace(/'/g, "''");
             const filterStr = encodeURIComponent(`contains(Message,'${safeName}')`);
             const response = await axios.get(
@@ -3948,6 +4243,10 @@ export class TM1Service {
     public async getChoreMessageLog(instanceName: string, sinceTimestamp: string): Promise<any[]> {
         const cfg = this.getConfig(instanceName);
         try {
+            if (await this.isV12(instanceName)) {
+                const rows = await this.getV12ProcessLogEntries(instanceName, { since: sinceTimestamp, top: 20000 });
+                return rows.filter(e => String(e.Message).toLowerCase().includes('chore')).reverse().slice(0, 2000);
+            }
             const filterStr = encodeURIComponent(`contains(tolower(Message),'chore') and TimeStamp ge ${sinceTimestamp}`);
             const response = await axios.get(
                 `${cfg.url}/api/v1/MessageLogEntries?$filter=${filterStr}&$orderby=TimeStamp desc&$top=2000`,

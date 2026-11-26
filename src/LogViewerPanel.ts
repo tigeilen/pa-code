@@ -30,6 +30,13 @@ export class LogViewerPanel {
                             ? await tm1.getMessageLogEntriesWindow(this._instanceName, msg.sinceIso, msg.top || 20000)
                             : (await tm1.getMessageLogEntries(this._instanceName, msg.top || 2000));
                         this._post('entries', { entries, mode: 'replace' });
+                        if (await tm1.isV12(this._instanceName)) {
+                            this._post('notice', {
+                                message: 'TM1 v12: the database message log is not available via the REST API (MessageLogEntries is always empty). '
+                                    + 'PA-Code shows the process execution logs instead (ErrorLogFiles, one file per process run). '
+                                    + 'Server-level entries such as startup or chore scheduling are only visible in Planning Analytics Workspace.'
+                            });
+                        }
                         break;
                     }
                     case 'older': {
@@ -176,6 +183,7 @@ mark { background: var(--vscode-editor-findMatchHighlightBackground, #ea5c0055);
         <button id="exportBtn" title="Export the filtered lines">Export</button>
         <span class="count" id="count"></span>
     </div>
+    <div id="notice" style="display:none; padding:6px 12px; font-size:12px; border-bottom:1px solid var(--border); background:var(--vscode-editorInfo-background, rgba(55,148,255,.1)); flex-shrink:0;"></div>
     <div class="log-head row"><span>Timestamp</span><span>Thread</span><span>Level</span><span>Logger</span><span>Message</span></div>
     <div class="log" id="log"></div>
     <div class="status" id="status">Loading…</div>
@@ -283,6 +291,7 @@ window.addEventListener('message', ev=>{
     const m = ev.data;
     if(m.command==='entries'){ mergeEntries(m.entries||[], m.mode); $('status').textContent = ALL.length + ' entries loaded' + (live?' · live':''); }
     else if(m.command==='error'){ $('status').textContent = 'Error: ' + m.message; }
+    else if(m.command==='notice'){ const b=$('notice'); b.textContent = 'ℹ️ ' + m.message; b.style.display='block'; }
 });
 updateLevelBtn();
 doLoad();

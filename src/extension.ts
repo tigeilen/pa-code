@@ -194,7 +194,17 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const ep = await mcpServer.ensureStarted();
+        let ep: { uri: string; token: string; version: string };
+        try {
+            ep = await mcpServer.ensureStarted();
+        } catch (e: any) {
+            const pick = await vscode.window.showErrorMessage(
+                `PA-Code MCP server could not be started: ${e?.message || e}`, 'Open Settings');
+            if (pick === 'Open Settings') {
+                vscode.commands.executeCommand('workbench.action.openSettings', 'pa-code.mcpServer.port');
+            }
+            return;
+        }
         const authHeader = `Authorization: Bearer ${ep.token}`;
 
         // Generic Streamable-HTTP MCP config used by most clients
@@ -1408,7 +1418,31 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                 }
 
-                if (statusCode === "CompletedSuccessfully" || statusCode === "Normal") {
+                const ok = statusCode === "CompletedSuccessfully" || statusCode === "Normal";
+                // TM1 v12 writes a log for every run (JSON Lines), so successful runs only offer it.
+                const openLog = async () => {
+                    try {
+                        if (!logContent) {
+                            logContent = await TM1Service.getInstance().getErrorLog(instanceName, logFilePath);
+                        }
+                        const readable = String(logContent).split(/\r?\n/).map(line => {
+                            try {
+                                const j = JSON.parse(line);
+                                if (j && typeof j === 'object' && 'message' in j) {
+                                    return `${j.timestamp ?? ''}  ${String(j.level ?? '').toUpperCase().padEnd(7)}  ${j.message}`;
+                                }
+                            } catch { /* plain text line */ }
+                            return line;
+                        }).join('\n');
+                        const doc = await vscode.workspace.openTextDocument({ content: readable, language: 'log' });
+                        await vscode.window.showTextDocument(doc, { preview: false });
+                    } catch (err: any) {
+                        vscode.window.showWarningMessage(`Could not open error log: ${err.message}`);
+                    }
+                };
+                const offerLog = (p: Thenable<string | undefined>) => { p.then(c => { if (c === 'Show Log') { void openLog(); } }); };
+
+                if (ok) {
                     // When the opt-in celebration is on it becomes the SOLE success toast
                     // (animated), so it isn't masked by a second, plain notification.
                     if (vscode.workspace.getConfiguration('pa-code').get<boolean>('delight.celebrateProcessSuccess', false)) {
@@ -1417,7 +1451,9 @@ export function activate(context: vscode.ExtensionContext) {
                     } else {
                         const fun = vscode.workspace.getConfiguration('pa-code').get<boolean>('delight.funMessages', true);
                         const base = fun ? CelebrationPanel.successMessage(processName, timeStr) : `Process '${processName}' successfully executed. (${timeStr})`;
-                        vscode.window.showInformationMessage(`${base}${messageStr}`);
+                        offerLog(logFilePath
+                            ? vscode.window.showInformationMessage(`${base}${messageStr}`, 'Show Log')
+                            : vscode.window.showInformationMessage(`${base}${messageStr}`));
                     }
                 } else if (statusCode === "HasMinorErrors" || statusCode === "CompletedWithMessages") {
                     vscode.window.showWarningMessage(`Process '${processName}' completed with warnings (${timeStr}, Status: ${statusCode}).${messageStr}`);
@@ -1425,16 +1461,8 @@ export function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage(`Process '${processName}' failed (${timeStr}, Status: ${statusCode}).${messageStr}`);
                 }
 
-                if (logFilePath) {
-                    try {
-                        if (!logContent) {
-                            logContent = await TM1Service.getInstance().getErrorLog(instanceName, logFilePath);
-                        }
-                        const doc = await vscode.workspace.openTextDocument({ content: logContent, language: 'log' });
-                        await vscode.window.showTextDocument(doc, { preview: false });
-                    } catch (err: any) {
-                        vscode.window.showWarningMessage(`Could not open error log: ${err.message}`);
-                    }
+                if (logFilePath && !ok) {
+                    await openLog();
                 }
             } catch (e: any) {
                 clearInterval(timer);

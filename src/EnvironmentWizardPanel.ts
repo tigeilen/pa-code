@@ -146,7 +146,7 @@ export class EnvironmentWizardPanel {
       <div class="card" data-type="onPremise"><div class="ic">🏢</div><div><div class="t">On-Premise — TM1 Admin Server</div><div class="d">Classic on-prem install. You point at a TM1 <b>Admin Server</b> (host + port) that lists the databases running on it.</div></div></div>
       <div class="card" data-type="singleInstance"><div class="ic">🎯</div><div><div class="t">On-Premise — Single Database (direct)</div><div class="d">Connect straight to one database's host and HTTP port, without going through an Admin Server.</div></div></div>
       <div class="card" data-type="customUrl"><div class="ic">☁️</div><div><div class="t">Cloud / Custom REST URL</div><div class="d">Planning Analytics on Cloud, or any TM1 reachable through a full REST API URL.</div></div></div>
-      <div class="card" data-type="v12Tenant"><div class="ic">🚀</div><div><div class="t">Planning Analytics v12 (Tenant)</div><div class="d">PA Engine v12 / PA as a Service — a tenant reached via its REST URL.</div></div></div>
+      <div class="card" data-type="v12Tenant"><div class="ic">🚀</div><div><div class="t">Planning Analytics v12 (Tenant)</div><div class="d">TM1 v12 / PA as a Service — a tenant reached via its REST URL.</div></div></div>
     </div>
   </div>
 

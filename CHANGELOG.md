@@ -4,6 +4,26 @@ All notable changes to the "pa-code" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [3.9.0] - 2026-11-26
+
+### Added
+- **Deployment Assistant: dependency suggestions** (#15). Adding a cube offers its rule (if any), dimensions, views and the subsets of its dimensions; adding a dimension offers its subsets. Rules and dimensions are pre-selected. Suggestions are grouped per cube/dimension and per category in **collapsible sections** (long lists start collapsed) with counts, per-category all/none links and a **search** box. A new **Add Dependencies…** button runs the lookup for every cube and dimension in the list.
+- **Clone an environment** (#13). A **Clone** button in the environment list opens the editor prefilled with a copy (`… (copy)`, folder `…_copy`); duplicate names are rejected, and an OAuth client secret is reused when left blank.
+- **Server Log on TM1 v12 / PA as a Service** (#11). v12 no longer serves the database message log via REST (`MessageLogEntries` is always empty). PA-Code now rebuilds the log from the per-run process logs in `ErrorLogFiles` (JSON Lines), with search, per-process logger filter, time range, *Older* and live tail, and shows a banner explaining the v12 behaviour. Chore history and the MCP message-log tool use the same source on v12.
+- What's New page for 3.9.0.
+
+### Fixes
+- **Process variables on datasource processes now show in PAW.** TM1 keeps PAW's per-variable settings in `VariablesUIData`, which PA-Code didn't read or write — so after adding or deleting a variable on a Cube View/ASCII/ODBC process, PAW showed stale or shifted variables. PA-Code now reads `VariablesUIData` into `#JSON_PROPERTIES` and realigns it on every save (existing variables keep their settings, new ones get *Other*, formula variables and ignored columns are preserved). Variables are now kept in datasource column order (TM1 returns them unsorted). **Existing `.ti` files without `VariablesUIData` keep working** — the server state is used; the key is added on the next pull. It is excluded from conflict detection.
+- **Parameter types are written as `String` / `Numeric`.** The Process Properties panel wrote `1`/`2`; TM1 actually derives the type from the JSON type of `Value`, so a numeric parameter with an empty value silently became a string. Parameters are now normalised before every save (`Numeric` with a number value, `String` with a text value), including legacy files.
+- **ODBC datasources use PAW's field set** (`dataSourceNameForClient/ForServer`, `userName`, `password`, `query`, `usesUnicode`) instead of extra long-form keys; legacy keys are still read.
+- **v12 process runs no longer open a log on success.** v12 writes a log for every run; successful runs now offer **Show Log**, failures still open it — JSON Lines logs are rendered readably and always read as text.
+- **MCP endpoint showed port 0** (#14) when the listener wasn't up (e.g. the fixed port was taken by another VS Code window). The endpoint is only reported once it is really listening; a busy port gives a clear error with a link to the setting.
+- **v12 detection** no longer fails because of the JSON `Accept` header on `ProductVersion/$value`; the PAaaS URL pattern is recognised as well.
+- Wording: **TM1 v12** instead of “PA Engine v12” in the environment wizard (#16).
+
+### Changed
+- Refreshed PA-Code logo.
+
 ## [3.8.8] - 2026-11-12
 
 ### Added
